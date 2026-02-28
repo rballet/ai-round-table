@@ -46,6 +46,8 @@ class Spec104Provider(BaseLLMProvider):
                 '{"request_token": false, "novelty_tier": "reinforcement", '
                 '"justification": "I have nothing new."}'
             )
+        if "evaluate if the discussion is converging" in system_message:
+            return '{"status": "converging", "novel_claims_this_round": 0, "justification": "Done."}'
         return "fallback completion"
 
 
@@ -217,7 +219,7 @@ async def test_orchestrator_runs_think_then_single_argue_turn_with_queue_audit(
 
     provider = Spec104Provider()
     llm_client = LLMClient(
-        providers={"fake": provider},
+        providers={"fake": provider, "openai": provider},
         timeout_seconds=1.0,
         rate_limit_backoff_seconds=0.0,
     )

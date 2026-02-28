@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Mapping
+from typing import Mapping, Any
+import json
+
+from llm.client import LLMClient
+from llm.prompts.moderator import build_moderator_prompt
 
 
 NOVELTY_SCORES: dict[str, float] = {
@@ -42,6 +46,14 @@ class QueueCandidate:
 class ModeratorState:
     total_turns_elapsed: int = 0
     last_turn_by_agent: dict[str, int] = field(default_factory=dict)
+    consecutive_converging_turns: int = 0
+
+@dataclass
+class ConvergenceCheckResult:
+    status: str
+    novel_claims_this_round: int
+    justification: str
+    should_terminate: bool
 
 
 class ModeratorEngine:
@@ -50,6 +62,69 @@ class ModeratorEngine:
         self._weight_recency = float(priority_weights.get("recency", 0.4))
         self._weight_novelty = float(priority_weights.get("novelty", 0.5))
         self._weight_role = float(priority_weights.get("role", 0.1))
+
+    async def evaluate_convergence(
+        self,
+        *,
+        topic: str,
+        supporting_context: str | None,
+        transcript: list[Any],
+        llm_client: LLMClient,
+        participant_count: int,
+        state: ModeratorState,
+        config: dict,
+    ) -> ConvergenceCheckResult:
+        messages = build_moderator_prompt(
+            topic=topic,
+            supporting_context=supporting_context,
+            transcript=transcript,
+        )
+        
+        # Try to use openai gpt-4o-mini by default since the user's config may not specify one for the moderator
+        provider = config.get("moderator_provider", "openai")
+        model = config.get("moderator_model", "gpt-4o-mini")
+
+        response = await llm_client.complete(
+            provider=provider,
+            model=model,
+            messages=messages,
+        )
+
+        try:
+            cleaned_response = response.strip()
+            if cleaned_response.startswith("```json"):
+                cleaned_response = cleaned_response[7:]
+            if cleaned_response.endswith("```"):
+                cleaned_response = cleaned_response[:-3]
+            parsed = json.loads(cleaned_response)
+        except json.JSONDecodeError:
+            parsed = {
+                "status": "open",
+                "novel_claims_this_round": 1,
+                "justification": "Failed to parse moderator response.",
+            }
+
+        status = str(parsed.get("status", "open"))
+        try:
+            novel_claims_this_round = int(parsed.get("novel_claims_this_round", 1))
+        except (ValueError, TypeError):
+            novel_claims_this_round = 1
+        justification = str(parsed.get("justification", ""))
+
+        if status == "converging" and novel_claims_this_round == 0:
+            state.consecutive_converging_turns += 1
+        else:
+            state.consecutive_converging_turns = 0
+
+        convergence_threshold = max(participant_count, 1)
+        should_terminate = state.consecutive_converging_turns >= convergence_threshold
+
+        return ConvergenceCheckResult(
+            status=status,
+            novel_claims_this_round=novel_claims_this_round,
+            justification=justification,
+            should_terminate=should_terminate,
+        )
 
     def compute_priority_score(
         self,

@@ -50,6 +50,27 @@ def _scribe() -> dict:
         "role": "scribe",
     }
 
+class MockSessionFactory:
+    def __init__(self, db_session):
+        self.db_session = db_session
+    def __call__(self):
+        return self
+    async def __aenter__(self):
+        return self.db_session
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
+    def begin(self):
+        class DummyBegin:
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+        return DummyBegin()
+    async def commit(self):
+        pass
+    async def rollback(self):
+        pass
+
 @pytest.mark.asyncio
 async def test_orchestrator_max_rounds_cap(db):
     # Setup session
@@ -66,50 +87,53 @@ async def test_orchestrator_max_rounds_cap(db):
     )
     session = await session_service.create_session(db, request)
     
-    # Mock LLM Client
-    mock_llm = MagicMock()
-    # Mock responses for different phases
-    mock_llm.complete = AsyncMock(side_effect=[
-        # Both agents think initially (round 0)
-        "Alice's initial thought", 
-        "Bob's initial thought",
-        
-        # Round 1 - Turn 0 (Alice)
-        "Alice's argument", 
-        "Bob's updated thought", # Bob evaluates Alice's point
-        '{"request_token": false, "novelty_tier": "reinforcement", "justification": "I am done"}', # Bob decides
-        
-        # Round 1 - Turn 1 (Bob)
-        "Bob's argument",        # Bob speaks next
-        "Alice's updated thought", # Alice evaluates Bob's point
-        '{"request_token": false, "novelty_tier": "reinforcement", "justification": "I am done"}', # Alice decides
-        
-        # Finally, the scribe phase cap happens after round 1 finishes
-        "Summary content" # Scribe phase
-    ])
+    # The issue here is the mock_llm is just a MagicMock. LLMClient parses `providers` now.
+    from llm.client import LLMClient
+    from llm.providers.base import BaseLLMProvider
+    from llm.types import Message, LLMConfig
+    
+    class CapMockProvider(BaseLLMProvider):
+        def __init__(self):
+            self.responses = [
+                # Both agents think initially (round 0)
+                "Alice's initial thought", 
+                "Bob's initial thought",
+                
+                # Round 1 - Turn 0 (Alice)
+                "Alice's argument", 
+                "Bob's updated thought", # Bob evaluates Alice's point
+                '{"request_token": false, "novelty_tier": "reinforcement", "justification": "I am done"}', # Bob decides
+                
+                # Round 1 - Turn 1 (Bob)
+                "Bob's argument",        # Bob speaks next
+                "Alice's updated thought", # Alice evaluates Bob's point
+                '{"request_token": false, "novelty_tier": "reinforcement", "justification": "I am done"}', # Alice decides
+                
+                # Finally, the scribe phase cap happens after round 1 finishes
+                "Summary content" # Scribe phase
+            ]
+            self.index = 0
+            
+        async def complete(self, model: str, messages: list[Message], config: LLMConfig | None = None) -> str:
+            resp = self.responses[self.index]
+            self.index += 1
+            return resp
+            
+    test_provider = CapMockProvider()
+    test_provider = CapMockProvider()
+    llm_client = LLMClient(
+        providers={"openai": test_provider},
+        timeout_seconds=5.0,
+        rate_limit_backoff_seconds=0.0,
+    )
     
     broadcast_manager = BroadcastManager()
-    
-    class MockSessionFactory:
-        def __init__(self, db_session):
-            self.db_session = db_session
-        def __call__(self):
-            return self
-        async def __aenter__(self):
-            return self.db_session
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
-            # Do nothing to preserve the session for test asserts
-            pass
-            
-    # Mock commit instead of actually committing the test fixture session
-    db.commit = AsyncMock()
-    db.refresh = AsyncMock()
 
     orchestrator = SessionOrchestrator(
         session_id=session.id,
         session_factory=MockSessionFactory(db),
         broadcast_manager=broadcast_manager,
-        llm_client=mock_llm
+        llm_client=llm_client
     )
     
     await orchestrator.run("Let's begin.")

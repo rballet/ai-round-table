@@ -256,11 +256,11 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 **Track:** Backend (builds on SPEC-202)
 
-- [ ] Implement `moderator.py` prompt builder for convergence check
-- [ ] Implement `ModeratorEngine.evaluate_convergence()` — calls LLM, parses JSON response, updates claim registry and alignment map
-- [ ] Integrate into orchestration loop after each argue turn
-- [ ] Broadcast `CONVERGENCE_CHECK` event after each evaluation
-- [ ] Handle both termination paths: consensus and cap
+- [x] Implement `moderator.py` prompt builder for convergence check
+- [x] Implement `ModeratorEngine.evaluate_convergence()` — calls LLM, parses JSON response, updates claim registry and alignment map
+- [x] Integrate into orchestration loop after each argue turn
+- [x] Broadcast `CONVERGENCE_CHECK` event after each evaluation
+- [x] Handle both termination paths: consensus and cap
 
 **Done when:** A session terminates organically when majority is reached with no new claims, and the termination reason is correctly set.
 

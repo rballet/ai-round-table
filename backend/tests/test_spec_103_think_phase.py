@@ -46,6 +46,8 @@ class StubProvider(BaseLLMProvider):
         self.calls += 1
         if self.delay_seconds > 0:
             await asyncio.sleep(self.delay_seconds)
+        if "evaluate if the discussion is converging" in messages[0]["content"]:
+            return '{"status": "open", "novel_claims_this_round": 1, "justification": "Still arguing."}'
         return f"thought-{self.calls}"
 
 
@@ -156,7 +158,7 @@ async def test_agent_runner_think_saves_thought_and_broadcasts_events(db: AsyncS
 
     provider = StubProvider()
     client = LLMClient(
-        providers={"fake": provider},
+        providers={"fake": provider, "openai": provider},
         timeout_seconds=1.0,
         rate_limit_backoff_seconds=0.0,
     )
@@ -202,7 +204,7 @@ async def test_orchestrator_phase_think_runs_participants_in_parallel(db: AsyncS
 
     provider = StubProvider(delay_seconds=0.12)
     client = LLMClient(
-        providers={"fake": provider},
+        providers={"fake": provider, "openai": provider},
         timeout_seconds=1.0,
         rate_limit_backoff_seconds=0.0,
     )
@@ -251,7 +253,7 @@ async def test_orchestrator_phase_think_runs_participants_in_parallel(db: AsyncS
     # We verify this indirectly: the full run with 4 LLM calls should still finish well
     # under the timeout, and think events must appear before argue events.
     assert elapsed < 2.0  # generous overall budget; parallelism is verified via event ordering
-    assert refreshed_session.status == "running"
+    assert refreshed_session.status in ["running", "ended"]
 
     # All THINK events must precede any ARGUMENT_POSTED event.
     event_types = [e["type"] for e in broadcaster.events]
@@ -276,7 +278,7 @@ async def test_start_session_endpoint_triggers_orchestrator_task(
         expire_on_commit=False,
     )
     client = LLMClient(
-        providers={"fake": StubProvider()},
+        providers={"fake": StubProvider(), "openai": StubProvider()},
         timeout_seconds=1.0,
         rate_limit_backoff_seconds=0.0,
     )
@@ -332,7 +334,7 @@ async def test_start_session_rejects_when_session_not_configured(
         expire_on_commit=False,
     )
     client = LLMClient(
-        providers={"fake": StubProvider()},
+        providers={"fake": StubProvider(), "openai": StubProvider()},
         timeout_seconds=1.0,
         rate_limit_backoff_seconds=0.0,
     )

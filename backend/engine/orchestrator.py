@@ -287,6 +287,36 @@ class SessionOrchestrator:
         moderator_state.last_turn_by_agent[speaker.id] = turn_index
         await self._broadcast_queue_snapshot(queue_manager)
 
+        # Convergence Check phase
+        async with self._session_factory() as db:
+            updated_transcript = await argument_service.list_arguments_for_session(
+                db, session_id=self._session_id
+            )
+            
+        convergence_result = await moderator.evaluate_convergence(
+            topic=topic,
+            supporting_context=supporting_context,
+            transcript=updated_transcript,
+            llm_client=self._llm_client,
+            participant_count=len(participants),
+            state=moderator_state,
+            config=config,
+        )
+
+        await self._emit_event(
+            "CONVERGENCE_CHECK",
+            {
+                "status": "capped" if convergence_result.should_terminate else convergence_result.status,
+                "rounds_elapsed": round_index,
+                "novel_claims_this_round": convergence_result.novel_claims_this_round,
+            },
+        )
+        
+        if convergence_result.should_terminate:
+            self._termination_flag = True
+            self._termination_reason = "consensus"
+            return True
+
         # Update & decide phases follow every argue turn.
         await self._phase_update_all(
             active_agent_id=speaker.id,

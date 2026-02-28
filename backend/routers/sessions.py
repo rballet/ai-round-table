@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -242,7 +243,7 @@ async def get_transcript(
 @router.get("/{session_id}/thoughts", response_model=ThoughtsResponseSchema)
 async def get_thoughts(
     session_id: str,
-    version: int | None = None,
+    version: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
 ) -> ThoughtsResponseSchema:
     session = await session_service.get_session(db, session_id)
