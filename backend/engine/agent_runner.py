@@ -12,6 +12,7 @@ from llm.client import LLMClient
 from llm.prompts.argue import build_argue_messages
 from llm.prompts.decide import build_decide_messages
 from llm.prompts.think import build_think_messages
+from llm.prompts.update import build_update_messages
 from models.argument import Argument
 from models.thought import Thought
 from services import argument_service, thought_service
@@ -77,6 +78,29 @@ class AgentRunner:
             agent_id=agent.id,
             round_index=context_bundle.round_index,
             turn_index=context_bundle.turn_index,
+            content=completion,
+        )
+
+    async def update(
+        self,
+        agent: AgentContext,
+        context_bundle: ContextBundle,
+    ) -> Thought:
+        """Update an agent's private thought after hearing another agent's argument.
+
+        Saves a new version of the thought to the DB and returns it.
+        Broadcasting is the orchestrator's responsibility.
+        """
+        completion = await self._llm_client.complete(
+            provider=agent.llm_provider,
+            model=agent.llm_model,
+            messages=build_update_messages(context_bundle),
+            config=agent.llm_config or {},
+        )
+        return await thought_service.save_thought(
+            self._db,
+            session_id=self._session_id,
+            agent_id=agent.id,
             content=completion,
         )
 
