@@ -112,11 +112,11 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 #### Backend: `SPEC-101-BE`
 
-- [ ] `POST /sessions` — validate request, persist Session + Agents to SQLite, return `201`
-- [ ] `GET /sessions` — return list of all sessions
-- [ ] `GET /sessions/{id}` — return session with agents
-- [ ] `GET /agents/presets` — return hardcoded list of persona templates
-- [ ] Unit tests for session service
+- [x] `POST /sessions` — validate request, persist Session + Agents to SQLite, return `201`
+- [x] `GET /sessions` — return list of all sessions
+- [x] `GET /sessions/{id}` — return session with agents
+- [x] `GET /agents/presets` — return hardcoded list of persona templates
+- [x] Unit tests for session service
 
 **Inputs:** `CreateSessionRequest`  
 **Outputs:** `Session` with nested `Agent[]`  
