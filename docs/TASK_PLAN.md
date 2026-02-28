@@ -190,14 +190,14 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 **Track:** Frontend only (parallel with SPEC-103/104)
 
-- [ ] Live session page (`/sessions/{id}`) layout — table canvas left, argument feed right
-- [ ] `RoundTable` component — static SVG ellipse with agent seats arranged by index
-- [ ] `AgentSeat` component — avatar circle, name label, static status badge
-- [ ] `ArgumentFeed` component — scrollable list, `ArgumentBubble` for each entry
-- [ ] `useWebSocket` hook — connects to WS, dispatches events to Zustand store
-- [ ] `sessionStore` Zustand slice — handles `ARGUMENT_POSTED`, `THINK_START/END`, `TOKEN_GRANTED`, `QUEUE_UPDATED`
-- [ ] WS Simulator emits: `SESSION_START → THINK_START (×N) → THINK_END (×N) → QUEUE_UPDATED → TOKEN_GRANTED → ARGUMENT_POSTED → QUEUE_UPDATED`
-- [ ] All states visible: agent avatars react to simulator events (thinking spinner, active glow)
+- [x] Live session page (`/sessions/{id}`) layout — table canvas left, argument feed right
+- [x] `RoundTable` component — static SVG ellipse with agent seats arranged by index
+- [x] `AgentSeat` component — avatar circle, name label, static status badge
+- [x] `ArgumentFeed` component — scrollable list, `ArgumentBubble` for each entry
+- [x] `useWebSocket` hook — connects to WS, dispatches events to Zustand store
+- [x] `sessionStore` Zustand slice — handles `ARGUMENT_POSTED`, `THINK_START/END`, `TOKEN_GRANTED`, `QUEUE_UPDATED`
+- [x] WS Simulator emits: `SESSION_START → THINK_START (×N) → THINK_END (×N) → QUEUE_UPDATED → TOKEN_GRANTED → ARGUMENT_POSTED → QUEUE_UPDATED`
+- [x] All states visible: agent avatars react to simulator events (thinking spinner, active glow)
 
 **Done when:** Loading the page with `USE_MOCK=true` shows a populated table with animated agents responding to the simulated event sequence.
 
@@ -205,7 +205,7 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 ### Phase 1 Integration
 
-- [ ] Connect frontend live session page to real backend
+- [x] Connect frontend live session page to real backend
 - [ ] Verify WS events arrive and trigger correct UI states
 - [ ] Manual end-to-end test: create session → start → watch one argument appear in UI
 
