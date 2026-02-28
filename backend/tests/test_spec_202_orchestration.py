@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from engine.orchestrator import SessionOrchestrator
 from engine.broadcast_manager import BroadcastManager
 from schemas.api import CreateSessionRequestSchema
@@ -88,6 +89,8 @@ async def test_orchestrator_max_rounds_cap(db):
     session = await session_service.create_session(db, request)
     
     # The issue here is the mock_llm is just a MagicMock. LLMClient parses `providers` now.
+    session_factory = async_sessionmaker(bind=db.bind, class_=AsyncSession, expire_on_commit=False)
+    
     from llm.client import LLMClient
     from llm.providers.base import BaseLLMProvider
     from llm.types import Message, LLMConfig
@@ -103,11 +106,13 @@ async def test_orchestrator_max_rounds_cap(db):
                 "Alice's argument", 
                 "Bob's updated thought", # Bob evaluates Alice's point
                 '{"request_token": false, "novelty_tier": "reinforcement", "justification": "I am done"}', # Bob decides
+                '{"status": "open", "novel_claims_this_round": 1, "justification": ""}', # Moderator convergence
                 
                 # Round 1 - Turn 1 (Bob)
                 "Bob's argument",        # Bob speaks next
                 "Alice's updated thought", # Alice evaluates Bob's point
                 '{"request_token": false, "novelty_tier": "reinforcement", "justification": "I am done"}', # Alice decides
+                '{"status": "open", "novel_claims_this_round": 1, "justification": ""}', # Moderator convergence
                 
                 # Finally, the scribe phase cap happens after round 1 finishes
                 "Summary content" # Scribe phase
@@ -131,7 +136,7 @@ async def test_orchestrator_max_rounds_cap(db):
 
     orchestrator = SessionOrchestrator(
         session_id=session.id,
-        session_factory=MockSessionFactory(db),
+        session_factory=async_sessionmaker(bind=db.bind, class_=AsyncSession, expire_on_commit=False),
         broadcast_manager=broadcast_manager,
         llm_client=llm_client
     )
@@ -185,7 +190,7 @@ async def test_orchestrator_pause_resume_end(db):
 
     orchestrator = SessionOrchestrator(
         session_id=session.id,
-        session_factory=MockSessionFactory(db),
+        session_factory=async_sessionmaker(bind=db.bind, class_=AsyncSession, expire_on_commit=False),
         broadcast_manager=broadcast_manager,
         llm_client=mock_llm
     )

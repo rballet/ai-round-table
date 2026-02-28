@@ -322,6 +322,7 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 - [ ] Test pause/resume mid-session
 - [ ] Test force-end before convergence
 - [ ] Verify cap termination produces a correctly labelled summary
+- [ ] Update frontend to listen to `CONVERGENCE_CHECK` WS event and update progress bar
 
 ---
 

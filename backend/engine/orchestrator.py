@@ -65,6 +65,7 @@ class SessionOrchestrator:
             config = session.config
             agents = [self._to_agent_context(agent) for agent in session.agents]
             participants = [a for a in agents if a.role == "participant"]
+            moderator_agent = [a for a in agents if a.role == "moderator"][0]
             priority_weights = {}
             if isinstance(config, dict):
                 priority_weights = config.get("priority_weights", {}) or {}
@@ -119,6 +120,7 @@ class SessionOrchestrator:
                 participants=participants,
                 queue_manager=queue_manager,
                 moderator=moderator,
+                moderator_agent=moderator_agent,
                 moderator_state=moderator_state,
                 config=config,
             )
@@ -216,6 +218,7 @@ class SessionOrchestrator:
         participants: list[AgentContext],
         queue_manager: QueueManager,
         moderator: ModeratorEngine,
+        moderator_agent: AgentContext,
         moderator_state: ModeratorState,
         config: dict,
     ) -> bool:
@@ -300,7 +303,7 @@ class SessionOrchestrator:
             llm_client=self._llm_client,
             participant_count=len(participants),
             state=moderator_state,
-            config=config,
+            moderator_agent=moderator_agent,
         )
 
         await self._emit_event(

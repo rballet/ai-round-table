@@ -259,15 +259,15 @@ async def test_orchestrator_runs_think_then_single_argue_turn_with_queue_audit(
         )
         refreshed_session = session_result.scalar_one()
 
-    # After think (2 thoughts) + update phase (1 new thought for the non-speaker): total = 3.
-    assert len(thoughts) == 3
-    assert len(arguments) == 1
+    # After think (2 thoughts) + 2 update phases (2 new thoughts for non-speakers): total = 4.
+    assert len(thoughts) == 4
+    assert len(arguments) == 2
     assert arguments[0].round_index == 1
     assert arguments[0].turn_index == 1
     # Initial queue: 2 entries. Decide phase may add more if agent requests token.
     assert len(queue_entries) >= 2
-    assert sum(1 for entry in queue_entries if entry.processed_at is not None) == 1
-    assert refreshed_session.status == "running"
+    assert sum(1 for entry in queue_entries if entry.processed_at is not None) == 2
+    assert refreshed_session.status == "ended"
 
     event_types = [event["type"] for event in broadcaster.events]
     assert event_types.count("SESSION_START") == 1
@@ -275,11 +275,11 @@ async def test_orchestrator_runs_think_then_single_argue_turn_with_queue_audit(
     assert event_types.count("THINK_END") == 2
     # QUEUE_UPDATED: once after init_queue, once after argue, once after decide_all = >= 3
     assert event_types.count("QUEUE_UPDATED") >= 2
-    assert event_types.count("TOKEN_GRANTED") == 1
-    assert event_types.count("ARGUMENT_POSTED") == 1
-    # Update phase events for the 1 non-speaking participant.
-    assert event_types.count("UPDATE_START") == 1
-    assert event_types.count("UPDATE_END") == 1
+    assert event_types.count("TOKEN_GRANTED") == 2
+    assert event_types.count("ARGUMENT_POSTED") == 2
+    # Update phase events for the non-speaking participant.
+    assert event_types.count("UPDATE_START") == 2
+    assert event_types.count("UPDATE_END") == 2
 
     first_queue_event = next(
         event for event in broadcaster.events if event["type"] == "QUEUE_UPDATED"

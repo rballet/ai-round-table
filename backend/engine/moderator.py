@@ -6,6 +6,7 @@ import json
 
 from llm.client import LLMClient
 from llm.prompts.moderator import build_moderator_prompt
+from engine.context import AgentContext
 
 
 NOVELTY_SCORES: dict[str, float] = {
@@ -72,7 +73,7 @@ class ModeratorEngine:
         llm_client: LLMClient,
         participant_count: int,
         state: ModeratorState,
-        config: dict,
+        moderator_agent: AgentContext,
     ) -> ConvergenceCheckResult:
         messages = build_moderator_prompt(
             topic=topic,
@@ -80,14 +81,11 @@ class ModeratorEngine:
             transcript=transcript,
         )
         
-        # Try to use openai gpt-4o-mini by default since the user's config may not specify one for the moderator
-        provider = config.get("moderator_provider", "openai")
-        model = config.get("moderator_model", "gpt-4o-mini")
-
         response = await llm_client.complete(
-            provider=provider,
-            model=model,
+            provider=moderator_agent.llm_provider,
+            model=moderator_agent.llm_model,
             messages=messages,
+            config=moderator_agent.llm_config,
         )
 
         try:

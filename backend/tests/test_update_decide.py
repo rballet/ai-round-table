@@ -80,8 +80,6 @@ class Spec201Provider(BaseLLMProvider):
                 '{"request_token": false, "novelty_tier": "reinforcement", '
                 '"justification": "Nothing new to add."}'
             )
-        if "evaluate if the discussion is converging" in system:
-            return '{"status": "converging", "novel_claims_this_round": 0, "justification": "Done."}'
         return "fallback completion"
 
 
@@ -156,10 +154,10 @@ class UpdateFailureProvider(Spec201Provider):
 
 def _make_config(*, thought_inspector_enabled: bool = False) -> SessionConfigSchema:
     return SessionConfigSchema(
+        max_rounds=5,
         convergence_majority=0.66,
         priority_weights={"recency": 0.4, "novelty": 0.5, "role": 0.1},
         thought_inspector_enabled=thought_inspector_enabled,
-        max_rounds=1,
     )
 
 
@@ -230,7 +228,7 @@ def _make_orchestrator(
     provider: BaseLLMProvider,
 ) -> SessionOrchestrator:
     llm_client = LLMClient(
-        providers={"fake": provider, "openai": provider},
+        providers={"fake": provider},
         timeout_seconds=5.0,
         rate_limit_backoff_seconds=0.0,
     )
@@ -577,9 +575,10 @@ async def test_orchestrator_broadcasts_update_start_and_end(db: AsyncSession):
     await orchestrator.run(prompt="Which architecture should we choose?")
 
     event_types = broadcaster.event_types()
-    # 1 round = 2 turns = 2 update phases (each hits 1 non-active participant) = 2 events
-    assert event_types.count("UPDATE_START") == 2
-    assert event_types.count("UPDATE_END") == 2
+    # There are 2 participants; 1 argues; 1 non-active participant should get update events.
+    # Expecting 3 UPDATE_START/ENDs for 3 turns.
+    assert event_types.count("UPDATE_START") == 3
+    assert event_types.count("UPDATE_END") == 3
 
 
 @pytest.mark.asyncio
@@ -603,12 +602,21 @@ async def test_orchestrator_update_failure_still_emits_update_end_for_failing_ag
 
     await orchestrator.run(prompt="Which architecture should we choose?")
 
-    event_types = broadcaster.event_types()
-    # 1 round = 3 turns = 3 update phases * 2 non-speakers = 6 UPDATE_START/END
-    assert event_types.count("UPDATE_START") == 6
-    assert event_types.count("UPDATE_END") == 6
+    token_granted = broadcaster.events_of_type("TOKEN_GRANTED")[0]
+    speaker_id = token_granted["agent_id"]
+    non_speakers = {
+        participant_id
+        for participant_id in participant_ids.values()
+        if participant_id != speaker_id
+    }
 
-    assert broadcaster.event_types().count("ARGUMENT_POSTED") == 3
+    update_start_ids = [event["agent_id"] for event in broadcaster.events_of_type("UPDATE_START")]
+    update_end_ids = [event["agent_id"] for event in broadcaster.events_of_type("UPDATE_END")]
+
+    assert set(update_start_ids) == set(participant_ids.values())
+    assert set(update_end_ids) == set(participant_ids.values())
+    assert participant_ids["Bob"] in update_end_ids
+    assert broadcaster.event_types().count("ARGUMENT_POSTED") == 4
 
     async with session_factory() as verify_db:
         thoughts_result = await verify_db.execute(
@@ -623,8 +631,8 @@ async def test_orchestrator_update_failure_still_emits_update_end_for_failing_ag
         )
         bob_thoughts = list(bob_thoughts_result.scalars().all())
 
-    # Three initial think thoughts + 4 successful update thoughts.
-    assert len(thoughts) == 7
+    # Three initial think thoughts + 6 successful update thoughts.
+    assert len(thoughts) == 9
     assert len(bob_thoughts) == 1
 
 
@@ -663,9 +671,9 @@ async def test_orchestrator_with_three_participants_updates_and_decides_for_two_
 
     await orchestrator.run(prompt="Which architecture?")
 
-    assert provider.decide_call_count == 6
-    assert broadcaster.event_types().count("UPDATE_START") == 6
-    assert broadcaster.event_types().count("UPDATE_END") == 6
+    assert provider.decide_call_count == 8
+    assert broadcaster.event_types().count("UPDATE_START") == 8
+    assert broadcaster.event_types().count("UPDATE_END") == 8
     assert broadcaster.event_types().count("TOKEN_REQUEST") == 1
 
     async with session_factory() as verify_db:
@@ -678,8 +686,8 @@ async def test_orchestrator_with_three_participants_updates_and_decides_for_two_
         )
         queue_entries = list(queue_entries_result.scalars().all())
 
-    # 3 think thoughts + 6 update thoughts.
-    assert len(thoughts) == 9
+    # 3 think thoughts + 8 update thoughts.
+    assert len(thoughts) == 11
     # 3 initial queue entries + 1 decide re-entry.
     assert len(queue_entries) == 4
 
@@ -698,7 +706,7 @@ async def test_orchestrator_update_events_not_emitted_for_active_speaker(db: Asy
 
     await orchestrator.run(prompt="Which architecture?")
 
-    # Check the first turn's events
+    # The speaker's agent_id from TOKEN_GRANTED.
     events = broadcaster.events
     token_granted_idx = next(i for i, e in enumerate(events) if e["type"] == "TOKEN_GRANTED")
     speaker_id = events[token_granted_idx]["agent_id"]
@@ -706,7 +714,6 @@ async def test_orchestrator_update_events_not_emitted_for_active_speaker(db: Asy
     turn_1_update_starts = []
     for e in events[token_granted_idx:]:
         if e["type"] == "TOKEN_GRANTED" and e["agent_id"] != speaker_id:
-            # We reached the next turn
             break
         if e["type"] == "UPDATE_START":
             turn_1_update_starts.append(e)
@@ -736,8 +743,8 @@ async def test_orchestrator_update_creates_new_thought_versions(db: AsyncSession
         )
         thoughts = list(result.scalars().all())
 
-    # 2 initial think thoughts + 2 update thoughts for the non-active participant over 2 turns.
-    assert len(thoughts) == 4
+    # 2 initial think thoughts + 3 update thoughts over 3 turns.
+    assert len(thoughts) == 5
 
 
 @pytest.mark.asyncio
@@ -780,7 +787,7 @@ async def test_orchestrator_thought_updated_emitted_when_inspector_enabled(
     await orchestrator.run(prompt="Which architecture?")
 
     thought_updated_events = broadcaster.events_of_type("THOUGHT_UPDATED")
-    assert len(thought_updated_events) == 2
+    assert len(thought_updated_events) == 3
     # Event must carry the updated thought as a nested object with required fields.
     event = thought_updated_events[0]
     assert "thought" in event
@@ -941,9 +948,9 @@ async def test_orchestrator_no_update_events_when_single_participant(db: AsyncSe
 
     await orchestrator.run(prompt="Which architecture?")
 
-    # With 2 participants over 2 turns, exactly 2 UPDATE_STARTs happen.
-    assert broadcaster.event_types().count("UPDATE_START") == 2
-    assert broadcaster.event_types().count("UPDATE_END") == 2
+    # With 2 participants over 3 turns, exactly 3 gets UPDATE_START/END (the non-active one).
+    assert broadcaster.event_types().count("UPDATE_START") == 3
+    assert broadcaster.event_types().count("UPDATE_END") == 3
 
 
 @pytest.mark.asyncio
