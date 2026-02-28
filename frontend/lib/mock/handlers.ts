@@ -1,4 +1,9 @@
 import { http, HttpResponse } from 'msw';
+import { Agent } from 'shared/types/agent';
+
+// ---------------------------------------------------------------------------
+// Fixture data (used by SPEC-101-FE session list + detail pages)
+// ---------------------------------------------------------------------------
 
 const MOCK_SESSIONS = [
   {
@@ -54,7 +59,7 @@ const MOCK_SESSIONS = [
   },
 ];
 
-const MOCK_AGENTS = [
+const MOCK_AGENTS: Agent[] = [
   {
     id: 'agent_mod_001',
     session_id: 'sess_mock_001',
@@ -140,6 +145,69 @@ const MOCK_PRESETS = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// buildMockAgents — used by SPEC-105 live session UI for ad-hoc sessions
+// ---------------------------------------------------------------------------
+
+function buildMockAgents(sessionId: string): Agent[] {
+    return [
+        {
+            id: 'agt_mod_1',
+            session_id: sessionId,
+            display_name: 'Moderator Maya',
+            persona_description: 'Maintains structure and fairness.',
+            expertise: 'Facilitation',
+            llm_provider: 'openai',
+            llm_model: 'gpt-4.1',
+            role: 'moderator',
+        },
+        {
+            id: 'agt_scribe_1',
+            session_id: sessionId,
+            display_name: 'Scribe Sol',
+            persona_description: 'Summarizes points and decisions.',
+            expertise: 'Synthesis',
+            llm_provider: 'anthropic',
+            llm_model: 'claude-4.5-sonnet',
+            role: 'scribe',
+        },
+        {
+            id: 'agt_part_1',
+            session_id: sessionId,
+            display_name: 'Alex',
+            persona_description: 'Pragmatic backend specialist.',
+            expertise: 'Backend architecture',
+            llm_provider: 'openai',
+            llm_model: 'gpt-4.1',
+            role: 'participant',
+        },
+        {
+            id: 'agt_part_2',
+            session_id: sessionId,
+            display_name: 'Nia',
+            persona_description: 'Product and user-outcome advocate.',
+            expertise: 'Product strategy',
+            llm_provider: 'anthropic',
+            llm_model: 'claude-4.5-sonnet',
+            role: 'participant',
+        },
+        {
+            id: 'agt_part_3',
+            session_id: sessionId,
+            display_name: 'Ravi',
+            persona_description: 'Reliability and scaling expert.',
+            expertise: 'SRE',
+            llm_provider: 'openai',
+            llm_model: 'gpt-4.1-mini',
+            role: 'participant',
+        },
+    ];
+}
+
+// ---------------------------------------------------------------------------
+// Handlers
+// ---------------------------------------------------------------------------
+
 export const handlers = [
   http.get('/health', () => HttpResponse.json({ status: 'ok' })),
 
@@ -181,24 +249,34 @@ export const handlers = [
   ),
 
   http.get('/sessions/:id', ({ params }) => {
-    const session = MOCK_SESSIONS.find((s) => s.id === params.id) ?? {
-      id: params.id,
-      topic: 'Mock Discussion Topic',
-      status: 'configured',
+    const id = String(params.id);
+    const fixture = MOCK_SESSIONS.find((s) => s.id === id);
+    const fixtureAgents = MOCK_AGENTS.filter((a) => a.session_id === id);
+
+    if (fixture) {
+      return HttpResponse.json({ ...fixture, agents: fixtureAgents });
+    }
+
+    // Fallback for dynamically created sessions (SPEC-105 live session UI)
+    const agents = buildMockAgents(id);
+    return HttpResponse.json({
+      id,
+      topic: 'Should we split our API into microservices?',
+      supporting_context: 'Current product has 50k MAU with a 4-person team.',
+      status: 'running',
       config: {
-        max_rounds: 10,
-        convergence_majority: 0.6,
-        priority_weights: { recency: 0.4, novelty: 0.4, role: 0.2 },
+        max_rounds: 3,
+        convergence_majority: 0.7,
+        priority_weights: { recency: 1.0, novelty: 1.0, role: 1.0 },
         thought_inspector_enabled: false,
       },
       created_at: new Date().toISOString(),
       ended_at: null,
       termination_reason: null,
-      rounds_elapsed: 0,
-      agent_count: 0,
-    };
-    const agents = MOCK_AGENTS.filter((a) => a.session_id === params.id);
-    return HttpResponse.json({ ...session, agents });
+      rounds_elapsed: 1,
+      agent_count: agents.length,
+      agents,
+    });
   }),
 
   http.get('/sessions/:id/transcript', ({ params }) =>

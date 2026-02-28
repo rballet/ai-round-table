@@ -1,120 +1,128 @@
 'use client';
 
-import { use, useEffect } from 'react';
-import Link from 'next/link';
-import { api } from '@/../lib/api';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { api } from '../../../../lib/api';
+import { RoundTable } from '@/components/table/RoundTable';
+import { ArgumentFeed } from '@/components/feed/ArgumentFeed';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import { useSessionStore } from '@/store/sessionStore';
-import { StatusBadge } from '@/components/ui/StatusBadge';
 
-interface PageProps {
-  params: Promise<{ id: string }>;
-}
+export default function LiveSessionPage() {
+  const params = useParams<{ id: string | string[] }>();
+  const sessionId = useMemo(() => {
+    const raw = params?.id;
+    return Array.isArray(raw) ? raw[0] : raw ?? null;
+  }, [params]);
 
-export default function SessionDetailPage({ params }: PageProps) {
-  const { id } = use(params);
-  const { currentSession, currentAgents, setCurrentSession, setCurrentAgents } = useSessionStore();
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const session = useSessionStore((state) => state.session);
+  const agents = useSessionStore((state) => state.agents);
+  const argumentsList = useSessionStore((state) => state.arguments);
+  const queue = useSessionStore((state) => state.queue);
+  const agentStatuses = useSessionStore((state) => state.agentStatuses);
+  const initializeSession = useSessionStore((state) => state.initializeSession);
+
+  const { isConnected, connectionError } = useWebSocket(sessionId);
 
   useEffect(() => {
-    api
-      .getSession(id)
-      .then((res) => {
-        setCurrentSession(res);
-        setCurrentAgents(res.agents);
-      })
-      .catch(console.error);
-  }, [id, setCurrentSession, setCurrentAgents]);
+    if (!sessionId) {
+      return;
+    }
 
-  if (!currentSession) {
+    let mounted = true;
+
+    api
+      .getSession(sessionId)
+      .then((response) => {
+        if (!mounted) {
+          return;
+        }
+        initializeSession(response);
+      })
+      .catch((error) => {
+        if (!mounted) {
+          return;
+        }
+        setLoadError(error instanceof Error ? error.message : 'Failed to load session');
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [sessionId, initializeSession]);
+
+  if (!sessionId) {
     return (
-      <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex items-center justify-center">
-        <div className="space-y-3 text-center" role="status" aria-label="Loading session">
-          <div className="w-10 h-10 rounded-full border-2 border-zinc-300 dark:border-zinc-700 border-t-zinc-900 dark:border-t-white animate-spin mx-auto" />
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading session...</p>
-        </div>
+      <main className="min-h-screen bg-slate-50 px-6 py-10 text-slate-900">
+        <p className="mx-auto max-w-6xl rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+          Missing session id
+        </p>
+      </main>
+    );
+  }
+
+  if (!session && !loadError) {
+    return (
+      <main className="min-h-screen bg-slate-50 px-6 py-10 text-slate-900">
+        <p className="mx-auto max-w-6xl text-sm text-slate-500">Loading live session...</p>
+      </main>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <main className="min-h-screen bg-slate-50 px-6 py-10 text-slate-900">
+        <p className="mx-auto max-w-6xl rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+          {loadError}
+        </p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
-      <div className="max-w-4xl mx-auto px-6 py-10 space-y-8">
-        {/* Breadcrumb */}
-        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-          <Link
-            href="/"
-            className="hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-zinc-900 rounded"
-            aria-label="Back to sessions list"
-          >
-            Sessions
-          </Link>
-          <span aria-hidden="true">/</span>
-          <span className="text-zinc-900 dark:text-white font-medium truncate max-w-xs">
-            {currentSession.topic}
-          </span>
-        </nav>
-
-        {/* Session header */}
-        <header className="space-y-3">
-          <div className="flex items-start gap-3">
-            <h1 className="text-2xl font-bold tracking-tight flex-1">{currentSession.topic}</h1>
-            <StatusBadge status={currentSession.status} />
+    <main className="min-h-screen bg-slate-50 px-6 py-8 text-slate-900">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <header className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold">{session?.topic ?? 'Live Session'}</h1>
+            <span className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-600">
+              Session {sessionId}
+            </span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs ${
+                isConnected ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'
+              }`}
+            >
+              {isConnected ? 'WS Connected' : 'WS Disconnected'}
+            </span>
           </div>
-
-          <div className="flex flex-wrap gap-4 text-sm text-zinc-500 dark:text-zinc-400">
-            <span>Session ID: <code className="font-mono text-xs">{currentSession.id}</code></span>
-            {currentSession.agent_count !== undefined && (
-              <span>{currentSession.agent_count} agent{currentSession.agent_count !== 1 ? 's' : ''}</span>
-            )}
-            {currentSession.rounds_elapsed !== undefined && (
-              <span>Round {currentSession.rounds_elapsed} / {currentSession.config.max_rounds}</span>
-            )}
-          </div>
+          {connectionError && <p className="text-xs text-rose-600">{connectionError}</p>}
         </header>
 
-        {/* Placeholder notice */}
-        <div
-          className="p-6 rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-center space-y-2"
-          aria-label="Live session UI coming soon"
-        >
-          <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
-            Live session view
-          </p>
-          <p className="text-xs text-zinc-400 dark:text-zinc-500">
-            The full round table UI is built in SPEC-105. This placeholder confirms the session was created successfully.
-          </p>
-        </div>
-
-        {/* Agents list */}
-        {currentAgents.length > 0 && (
-          <section aria-label="Agent roster">
-            <h2 className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-3">
-              Agents ({currentAgents.length})
-            </h2>
-            <ul className="space-y-2" role="list">
-              {currentAgents.map((agent) => (
-                <li
-                  key={agent.id}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800"
-                >
-                  <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
-                    {agent.display_name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{agent.display_name}</p>
-                    {agent.expertise && (
-                      <p className="text-xs text-zinc-400 truncate">{agent.expertise}</p>
-                    )}
-                  </div>
-                  <span className="text-xs text-zinc-400 font-mono">{agent.role}</span>
-                </li>
-              ))}
-            </ul>
+        <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
+          <section className="space-y-4">
+            <RoundTable agents={agents} agentStatuses={agentStatuses} />
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <h2 className="mb-2 text-sm font-semibold text-slate-900">Queue Snapshot</h2>
+              {queue.length > 0 ? (
+                <ul className="space-y-1 text-sm text-slate-700">
+                  {queue.map((entry) => (
+                    <li key={`${entry.agent_id}-${entry.position}`}>
+                      {entry.position}. {entry.agent_name ?? entry.agent_id} ({entry.priority_score.toFixed(2)})
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-slate-500">Queue is empty.</p>
+              )}
+            </div>
           </section>
-        )}
-      </div>
 
-      {/* Aria live region for status announcements */}
-      <div aria-live="polite" aria-atomic="true" className="sr-only" id="status-announcer" />
+          <ArgumentFeed argumentsList={argumentsList} />
+        </div>
+      </div>
     </main>
   );
 }

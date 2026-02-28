@@ -1,10 +1,13 @@
 import { create } from 'zustand';
-import { Session } from 'shared/types/session';
-import { Agent } from 'shared/types/agent';
-import { SessionConfig } from 'shared/types/session';
+import { Session, SessionConfig } from 'shared/types/session';
+import { Agent, QueueEntry } from 'shared/types/agent';
+import { SessionResponse } from 'shared/types/api';
 import { RoundTableEvent } from 'shared/types/events';
 
-// Wizard state for session creation
+// ---------------------------------------------------------------------------
+// Wizard types (SPEC-101-FE: session creation)
+// ---------------------------------------------------------------------------
+
 export interface AgentDraft extends Omit<Agent, 'id' | 'session_id'> {}
 
 export interface WizardState {
@@ -34,29 +37,75 @@ const defaultWizard: WizardState = {
   config: defaultConfig,
 };
 
+// ---------------------------------------------------------------------------
+// Live session types (SPEC-105: live session UI)
+// ---------------------------------------------------------------------------
+
+export type AgentRuntimeStatus = 'idle' | 'thinking' | 'active' | 'updating';
+
+export interface LiveArgument {
+  id: string;
+  agent_id: string;
+  agent_name: string;
+  round_index: number;
+  turn_index: number;
+  content: string;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function toIdleStatuses(agents: Agent[]): Record<string, AgentRuntimeStatus> {
+  return Object.fromEntries(agents.map((agent) => [agent.id, 'idle']));
+}
+
+function markActiveStatus(
+  previous: Record<string, AgentRuntimeStatus>,
+  agents: Agent[],
+  activeAgentId: string
+): Record<string, AgentRuntimeStatus> {
+  const next = { ...previous };
+  for (const agent of agents) {
+    next[agent.id] = agent.id === activeAgentId ? 'active' : 'idle';
+  }
+  return next;
+}
+
+// ---------------------------------------------------------------------------
+// Combined store state
+// ---------------------------------------------------------------------------
+
 interface SessionStoreState {
-  // Session list
+  // --- Sessions list (SPEC-101-FE) ---
   sessions: Session[];
   sessionsLoading: boolean;
   sessionsError: string | null;
 
-  // Current live session
-  currentSession: Session | null;
-  currentAgents: Agent[];
+  // --- Live session (SPEC-105) ---
+  session: SessionResponse | null;
+  agents: Agent[];
+  arguments: LiveArgument[];
+  queue: QueueEntry[];
+  agentStatuses: Record<string, AgentRuntimeStatus>;
+  activeAgentId: string | null;
+  isConnected: boolean;
+  connectionError: string | null;
 
-  // Wizard state for new session creation
+  // --- Wizard (SPEC-101-FE) ---
   wizard: WizardState;
 
-  // Actions: sessions list
+  // --- Actions: sessions list ---
   setSessions: (sessions: Session[]) => void;
   setSessionsLoading: (loading: boolean) => void;
   setSessionsError: (error: string | null) => void;
 
-  // Actions: current session
-  setCurrentSession: (session: Session | null) => void;
-  setCurrentAgents: (agents: Agent[]) => void;
+  // --- Actions: live session (SPEC-105) ---
+  initializeSession: (session: SessionResponse) => void;
+  handleEvent: (event: RoundTableEvent) => void;
+  setConnectionState: (isConnected: boolean, error?: string | null) => void;
 
-  // Actions: wizard
+  // --- Actions: wizard ---
   setWizardStep: (step: 1 | 2 | 3) => void;
   setWizardTopic: (topic: string) => void;
   setWizardContext: (context: string) => void;
@@ -64,28 +113,120 @@ interface SessionStoreState {
   removeWizardAgent: (index: number) => void;
   setWizardConfig: (config: Partial<SessionConfig>) => void;
   resetWizard: () => void;
-
-  // WS event handler (source of truth during live sessions)
-  handleWSEvent: (event: RoundTableEvent) => void;
 }
 
 export const useSessionStore = create<SessionStoreState>((set) => ({
+  // Sessions list
   sessions: [],
   sessionsLoading: false,
   sessionsError: null,
 
-  currentSession: null,
-  currentAgents: [],
+  // Live session
+  session: null,
+  agents: [],
+  arguments: [],
+  queue: [],
+  agentStatuses: {},
+  activeAgentId: null,
+  isConnected: false,
+  connectionError: null,
 
-  wizard: { ...defaultWizard, config: { ...defaultConfig, priority_weights: { ...defaultConfig.priority_weights } } },
+  // Wizard
+  wizard: {
+    ...defaultWizard,
+    config: { ...defaultConfig, priority_weights: { ...defaultConfig.priority_weights } },
+  },
 
+  // --- Sessions list actions ---
   setSessions: (sessions) => set({ sessions }),
   setSessionsLoading: (sessionsLoading) => set({ sessionsLoading }),
   setSessionsError: (sessionsError) => set({ sessionsError }),
 
-  setCurrentSession: (currentSession) => set({ currentSession }),
-  setCurrentAgents: (currentAgents) => set({ currentAgents }),
+  // --- Live session actions (SPEC-105) ---
+  initializeSession: (session) =>
+    set({
+      session,
+      agents: session.agents,
+      arguments: [],
+      queue: [],
+      activeAgentId: null,
+      agentStatuses: toIdleStatuses(session.agents),
+      connectionError: null,
+    }),
 
+  setConnectionState: (isConnected, error = null) =>
+    set({ isConnected, connectionError: error }),
+
+  handleEvent: (event) =>
+    set((state) => {
+      switch (event.type) {
+        case 'SESSION_START': {
+          const agentStatuses =
+            state.agents.length === event.agents.length
+              ? state.agentStatuses
+              : toIdleStatuses(event.agents);
+          return {
+            session: state.session
+              ? { ...state.session, status: 'running', topic: event.topic, agents: event.agents }
+              : null,
+            agents: event.agents,
+            agentStatuses,
+          };
+        }
+        case 'THINK_START':
+          return {
+            agentStatuses: {
+              ...state.agentStatuses,
+              [event.agent_id]: 'thinking',
+            },
+          };
+        case 'THINK_END':
+          return {
+            agentStatuses: {
+              ...state.agentStatuses,
+              [event.agent_id]:
+                state.agentStatuses[event.agent_id] === 'active' ? 'active' : 'idle',
+            },
+          };
+        case 'TOKEN_GRANTED':
+          return {
+            activeAgentId: event.agent_id,
+            agentStatuses: markActiveStatus(state.agentStatuses, state.agents, event.agent_id),
+          };
+        case 'ARGUMENT_POSTED':
+          return {
+            arguments: [...state.arguments, event.argument],
+            activeAgentId: event.argument.agent_id,
+          };
+        case 'QUEUE_UPDATED':
+          return { queue: event.queue };
+        case 'UPDATE_START':
+          return {
+            agentStatuses: {
+              ...state.agentStatuses,
+              [event.agent_id]: 'updating',
+            },
+          };
+        case 'UPDATE_END':
+          return {
+            agentStatuses: {
+              ...state.agentStatuses,
+              [event.agent_id]:
+                state.agentStatuses[event.agent_id] === 'active' ? 'active' : 'idle',
+            },
+          };
+        case 'SESSION_END':
+          return {
+            activeAgentId: null,
+            session: state.session ? { ...state.session, status: 'ended' } : null,
+            agentStatuses: toIdleStatuses(state.agents),
+          };
+        default:
+          return state;
+      }
+    }),
+
+  // --- Wizard actions ---
   setWizardStep: (step) =>
     set((state) => ({ wizard: { ...state.wizard, step } })),
 
@@ -126,47 +267,4 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
         },
       },
     }),
-
-  handleWSEvent: (event) => {
-    set((state) => {
-      switch (event.type) {
-        case 'SESSION_START': {
-          return {
-            currentSession: state.currentSession
-              ? { ...state.currentSession, status: 'running' }
-              : null,
-          };
-        }
-        case 'SESSION_END': {
-          return {
-            currentSession: state.currentSession
-              ? {
-                  ...state.currentSession,
-                  status: 'ended',
-                  termination_reason: event.reason,
-                  ended_at: event.timestamp,
-                  rounds_elapsed: event.rounds_elapsed,
-                }
-              : null,
-          };
-        }
-        case 'SESSION_PAUSED': {
-          return {
-            currentSession: state.currentSession
-              ? { ...state.currentSession, status: 'paused' }
-              : null,
-          };
-        }
-        case 'SESSION_RESUMED': {
-          return {
-            currentSession: state.currentSession
-              ? { ...state.currentSession, status: 'running' }
-              : null,
-          };
-        }
-        default:
-          return {};
-      }
-    });
-  },
 }));

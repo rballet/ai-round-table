@@ -311,19 +311,18 @@ test.describe('New session wizard – Step 3', () => {
     // MSW POST /sessions returns a session with a dynamically generated id prefixed sess_mock_
     await page.waitForURL(/\/sessions\/sess_mock_/, { timeout: 10000 });
 
-    // The session detail page renders — the GET /sessions/{id} MSW fallback returns a
-    // placeholder session because the generated ID is not in the MOCK_SESSIONS fixture.
-    // Assert on the placeholder "Live session view" notice that always renders.
-    await expect(page.getByText('Live session view')).toBeVisible({ timeout: 10000 });
+    // The live session page (SPEC-105) renders with a heading for the session topic.
+    // The GET /sessions/{id} fallback handler returns a default topic for unknown IDs.
+    await expect(page.locator('h1')).toBeVisible({ timeout: 10000 });
   });
 });
 
 // ---------------------------------------------------------------------------
-// Session detail page
+// Session detail page (SPEC-105 live session UI)
 // ---------------------------------------------------------------------------
 
 test.describe('Session detail page', () => {
-  test('loads session data for an existing mock session', async ({ page }) => {
+  test('loads session data and shows the topic heading', async ({ page }) => {
     await page.goto('/sessions/sess_mock_001');
 
     await page.waitForSelector('h1', { timeout: 10000 });
@@ -331,32 +330,40 @@ test.describe('Session detail page', () => {
     await expect(
       page.getByRole('heading', { name: 'Should AI systems be regulated by governments?' }),
     ).toBeVisible();
-
-    await expect(page.locator('span[aria-label="Status: Running"]')).toBeVisible();
   });
 
-  test('shows the agents roster for a session that has agents', async ({ page }) => {
+  test('shows WS connection status badge', async ({ page }) => {
     await page.goto('/sessions/sess_mock_001');
 
-    await page.waitForSelector('[aria-label="Agent roster"]', { timeout: 10000 });
+    await page.waitForSelector('h1', { timeout: 10000 });
 
-    // MOCK_AGENTS contains 4 agents for sess_mock_001.
-    // Scope to the agent name <p> elements to avoid matching the role badge text.
-    const agentNames = page.locator('[aria-label="Agent roster"] p.text-sm.font-medium');
-    await expect(agentNames.getByText('Aria')).toBeVisible();
-    // "Scribe" appears both as an agent name and as a role badge text.
-    // Use the roster list to scope specifically to name elements.
-    await expect(agentNames.getByText('Scribe')).toBeVisible();
-    await expect(agentNames.getByText('The Challenger')).toBeVisible();
-    await expect(agentNames.getByText('The Pragmatist')).toBeVisible();
+    // The live session page always renders a WS status badge (connected or disconnected).
+    const wsConnected = page.getByText('WS Connected');
+    const wsDisconnected = page.getByText('WS Disconnected');
+    await expect(wsConnected.or(wsDisconnected)).toBeVisible();
   });
 
-  test('breadcrumb navigates back to the sessions list', async ({ page }) => {
+  test('renders the round table canvas and argument feed', async ({ page }) => {
     await page.goto('/sessions/sess_mock_001');
 
-    await page.waitForSelector('nav[aria-label="Breadcrumb"]', { timeout: 10000 });
-    await page.getByLabel('Back to sessions list').click();
+    await page.waitForSelector('h1', { timeout: 10000 });
 
-    await expect(page).toHaveURL('/');
+    // Queue Snapshot section from the live session page.
+    await expect(page.getByRole('heading', { name: 'Queue Snapshot' })).toBeVisible();
+
+    // ArgumentFeed renders with its heading.
+    await expect(page.getByRole('heading', { name: 'Argument Feed' })).toBeVisible();
+  });
+
+  test('shows agent seats for the mock session agents', async ({ page }) => {
+    await page.goto('/sessions/sess_mock_001');
+
+    await page.waitForSelector('h1', { timeout: 10000 });
+
+    // MOCK_AGENTS for sess_mock_001: Aria, Scribe, The Challenger, The Pragmatist.
+    // AgentSeat renders the agent name as a label.
+    await expect(page.getByText('Aria')).toBeVisible();
+    await expect(page.getByText('The Challenger')).toBeVisible();
+    await expect(page.getByText('The Pragmatist')).toBeVisible();
   });
 });

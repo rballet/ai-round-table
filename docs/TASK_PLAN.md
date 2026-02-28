@@ -112,11 +112,11 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 #### Backend: `SPEC-101-BE`
 
-- [ ] `POST /sessions` — validate request, persist Session + Agents to SQLite, return `201`
-- [ ] `GET /sessions` — return list of all sessions
-- [ ] `GET /sessions/{id}` — return session with agents
-- [ ] `GET /agents/presets` — return hardcoded list of persona templates
-- [ ] Unit tests for session service
+- [x] `POST /sessions` — validate request, persist Session + Agents to SQLite, return `201`
+- [x] `GET /sessions` — return list of all sessions
+- [x] `GET /sessions/{id}` — return session with agents
+- [x] `GET /agents/presets` — return hardcoded list of persona templates
+- [x] Unit tests for session service
 
 **Inputs:** `CreateSessionRequest`  
 **Outputs:** `Session` with nested `Agent[]`  
@@ -141,12 +141,12 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 **Track:** Backend only
 
-- [ ] Implement `BaseLLMProvider` abstract class
-- [ ] Implement `OpenAIProvider` — wraps `openai` async client
-- [ ] Implement `AnthropicProvider` — wraps `anthropic` async client
-- [ ] Implement `LLMClient` with provider registry
-- [ ] Unit tests with mocked HTTP responses for both providers
-- [ ] Error handling: timeout (30s), rate limit (retry once with backoff), invalid response
+- [x] Implement `BaseLLMProvider` abstract class
+- [x] Implement `OpenAIProvider` — wraps `openai` async client
+- [x] Implement `AnthropicProvider` — wraps `anthropic` async client
+- [x] Implement `LLMClient` with provider registry
+- [x] Unit tests with mocked HTTP responses for both providers
+- [x] Error handling: timeout (30s), rate limit (retry once with backoff), invalid response
 
 **Done when:** `LLMClient.complete(provider, model, messages, config)` works for both providers and handles errors gracefully.
 
@@ -156,11 +156,11 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 **Track:** Backend only
 
-- [ ] Implement `think.py` prompt builder — takes `ContextBundle`, returns `list[Message]`
-- [ ] Implement `AgentRunner.think(agent, context_bundle)` — calls LLM, saves `Thought` to SQLite
-- [ ] Implement parallel execution in `SessionOrchestrator._phase_think()` using `asyncio.gather()`
-- [ ] Broadcast `THINK_START` before each LLM call, `THINK_END` after
-- [ ] `POST /sessions/{id}/start` triggers the orchestrator
+- [x] Implement `think.py` prompt builder — takes `ContextBundle`, returns `list[Message]`
+- [x] Implement `AgentRunner.think(agent, context_bundle)` — calls LLM, saves `Thought` to SQLite
+- [x] Implement parallel execution in `SessionOrchestrator._phase_think()` using `asyncio.gather()`
+- [x] Broadcast `THINK_START` before each LLM call, `THINK_END` after
+- [x] `POST /sessions/{id}/start` triggers the orchestrator
 
 **Done when:** Calling `start` on a session causes all participant agents to think in parallel, thoughts are saved to SQLite, and WS events are emitted.
 
@@ -170,16 +170,19 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 **Track:** Backend only (builds on SPEC-103)
 
-- [ ] Implement `argue.py` prompt builder
-- [ ] Implement `AgentRunner.argue(agent, context_bundle)` — calls LLM, saves `Argument`
-- [ ] Implement `decide.py` prompt builder
-- [ ] Implement `AgentRunner.decide(agent, context_bundle)` — returns `DecideResult`
-- [ ] Implement `QueueManager` with `asyncio.PriorityQueue`
-- [ ] Implement `ModeratorEngine.compute_priority_score(entry, state)` 
-- [ ] One full turn loop: dequeue → argue → broadcast → return token
-- [ ] `QueueEntry` audit records written to SQLite on every push/pop
+- [x] Implement `argue.py` prompt builder
+- [x] Implement `AgentRunner.argue(agent, context_bundle)` — calls LLM, saves `Argument`
+- [x] Implement `decide.py` prompt builder
+- [x] Implement `AgentRunner.decide(agent, context_bundle)` — returns `DecideResult`
+- [x] Implement `QueueManager` with `asyncio.PriorityQueue`
+- [x] Implement `ModeratorEngine.compute_priority_score(entry, state)` 
+- [x] One full turn loop: dequeue → argue → broadcast → return token
+- [x] Milestone boundary: after think phase, execute exactly one dequeue/argue cycle, then stop (do not run full convergence loop yet)
+- [x] Session state after milestone run remains `running` (discussion is incomplete and continues in later specs)
+- [x] `QueueEntry` audit records written to SQLite on every push/pop
+- [x] Tests: unit tests for prompt builders/queue scoring + integration test for think → one argue turn with WS events and DB persistence
 
-**Done when:** After the think phase, one agent is dequeued, argues, and the argument is saved and broadcast.
+**Done when:** After the think phase, one agent is dequeued, argues once, the argument is saved and broadcast, queue audit writes exist, and tests cover the single-turn path.
 
 ---
 
@@ -187,14 +190,14 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 **Track:** Frontend only (parallel with SPEC-103/104)
 
-- [ ] Live session page (`/sessions/{id}`) layout — table canvas left, argument feed right
-- [ ] `RoundTable` component — static SVG ellipse with agent seats arranged by index
-- [ ] `AgentSeat` component — avatar circle, name label, static status badge
-- [ ] `ArgumentFeed` component — scrollable list, `ArgumentBubble` for each entry
-- [ ] `useWebSocket` hook — connects to WS, dispatches events to Zustand store
-- [ ] `sessionStore` Zustand slice — handles `ARGUMENT_POSTED`, `THINK_START/END`, `TOKEN_GRANTED`
-- [ ] WS Simulator emits: `SESSION_START → THINK_START (×N) → THINK_END (×N) → TOKEN_GRANTED → ARGUMENT_POSTED`
-- [ ] All states visible: agent avatars react to simulator events (thinking spinner, active glow)
+- [x] Live session page (`/sessions/{id}`) layout — table canvas left, argument feed right
+- [x] `RoundTable` component — static SVG ellipse with agent seats arranged by index
+- [x] `AgentSeat` component — avatar circle, name label, static status badge
+- [x] `ArgumentFeed` component — scrollable list, `ArgumentBubble` for each entry
+- [x] `useWebSocket` hook — connects to WS, dispatches events to Zustand store
+- [x] `sessionStore` Zustand slice — handles `ARGUMENT_POSTED`, `THINK_START/END`, `TOKEN_GRANTED`, `QUEUE_UPDATED`
+- [x] WS Simulator emits: `SESSION_START → THINK_START (×N) → THINK_END (×N) → QUEUE_UPDATED → TOKEN_GRANTED → ARGUMENT_POSTED → QUEUE_UPDATED`
+- [x] All states visible: agent avatars react to simulator events (thinking spinner, active glow)
 
 **Done when:** Loading the page with `USE_MOCK=true` shows a populated table with animated agents responding to the simulated event sequence.
 
@@ -202,7 +205,7 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 ### Phase 1 Integration
 
-- [ ] Connect frontend live session page to real backend
+- [x] Connect frontend live session page to real backend
 - [ ] Verify WS events arrive and trigger correct UI states
 - [ ] Manual end-to-end test: create session → start → watch one argument appear in UI
 
