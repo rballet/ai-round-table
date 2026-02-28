@@ -88,6 +88,70 @@ class Spec201ProviderInspector(Spec201Provider):
     pass
 
 
+class CountingSpec201Provider(Spec201Provider):
+    @property
+    def decide_call_count(self) -> int:
+        return self._decide_call_count
+
+
+class MalformedThenValidDecideProvider(BaseLLMProvider):
+    """Returns malformed JSON once for decide, then valid JSON on retry."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+        self.messages_by_call: list[list[Message]] = []
+
+    async def complete(
+        self,
+        model: str,
+        messages: list[Message],
+        config: LLMConfig | None = None,
+    ) -> str:
+        self.calls += 1
+        self.messages_by_call.append(messages)
+        if self.calls == 1:
+            return "not valid json"
+        return (
+            '{"request_token": true, "novelty_tier": "correction", '
+            '"justification": "Need to correct a factual error."}'
+        )
+
+
+class AlwaysMalformedDecideProvider(BaseLLMProvider):
+    """Returns malformed JSON for both initial decide response and retry."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def complete(
+        self,
+        model: str,
+        messages: list[Message],
+        config: LLMConfig | None = None,
+    ) -> str:
+        self.calls += 1
+        return "{ definitely-not-json"
+
+
+class UpdateFailureProvider(Spec201Provider):
+    """Fails update for Bob to exercise _phase_update_all() error handling."""
+
+    async def complete(
+        self,
+        model: str,
+        messages: list[Message],
+        config: LLMConfig | None = None,
+    ) -> str:
+        system = messages[0]["content"]
+        lower = system.lower()
+        is_update_prompt = "UPDATE your PRIVATE" in system or (
+            "update" in lower and "private" in lower
+        )
+        if is_update_prompt and "You are Bob." in system:
+            raise RuntimeError("synthetic update failure for Bob")
+        return await super().complete(model=model, messages=messages, config=config)
+
+
 def _make_config(*, thought_inspector_enabled: bool = False) -> SessionConfigSchema:
     return SessionConfigSchema(
         max_rounds=5,
@@ -134,17 +198,27 @@ def _scribe() -> dict:
 
 
 def _valid_request(*, thought_inspector_enabled: bool = False) -> CreateSessionRequestSchema:
+    return _valid_request_with_participants(
+        participant_names=["Alice", "Bob"],
+        thought_inspector_enabled=thought_inspector_enabled,
+    )
+
+
+def _valid_request_with_participants(
+    *,
+    participant_names: list[str],
+    thought_inspector_enabled: bool = False,
+) -> CreateSessionRequestSchema:
     return CreateSessionRequestSchema(
         topic="Should we prefer monoliths or microservices?",
         supporting_context="We are a team of six engineers and one designer.",
         config=_make_config(thought_inspector_enabled=thought_inspector_enabled),
-        agents=[
-            _participant("Alice"),
-            _participant("Bob"),
-            _moderator(),
-            _scribe(),
-        ],
+        agents=[*[_participant(name) for name in participant_names], _moderator(), _scribe()],
     )
+
+
+def _valid_request_three_participants() -> CreateSessionRequestSchema:
+    return _valid_request_with_participants(participant_names=["Alice", "Bob", "Charlie"])
 
 
 def _make_orchestrator(
@@ -365,6 +439,123 @@ async def test_agent_runner_update_does_not_broadcast(db: AsyncSession):
 
 
 # ---------------------------------------------------------------------------
+# Unit tests for AgentRunner.decide()
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_agent_runner_decide_retries_on_malformed_json_then_succeeds(
+    db: AsyncSession,
+):
+    """decide() should retry once with a JSON-only reminder when parsing fails."""
+    from engine.agent_runner import AgentRunner
+
+    session = await session_service.create_session(db, _valid_request())
+    participant = next(a for a in session.agents if a.role == "participant")
+
+    broadcaster = RecordingBroadcastManager()
+    provider = MalformedThenValidDecideProvider()
+    llm_client = LLMClient(
+        providers={"fake": provider},
+        timeout_seconds=5.0,
+        rate_limit_backoff_seconds=0.0,
+    )
+    runner = AgentRunner(
+        session_id=session.id,
+        db=db,
+        llm_client=llm_client,
+        broadcast_manager=broadcaster,
+    )
+    agent_ctx = AgentContext(
+        id=participant.id,
+        display_name=participant.display_name,
+        persona_description=participant.persona_description,
+        expertise=participant.expertise,
+        llm_provider=participant.llm_provider,
+        llm_model=participant.llm_model,
+        llm_config=participant.llm_config,
+        role=participant.role,
+    )
+    bundle = ContextBundle(
+        topic=session.topic,
+        prompt="Should we split the service now?",
+        supporting_context=session.supporting_context,
+        agent=agent_ctx,
+        current_thought="I should only speak if there is a material correction.",
+        transcript=[
+            {
+                "agent_name": "Alice",
+                "round_index": 1,
+                "turn_index": 1,
+                "content": "We already have clean domain boundaries.",
+            }
+        ],
+        round_index=1,
+        turn_index=1,
+    )
+
+    result = await runner.decide(agent_ctx, bundle)
+
+    assert provider.calls == 2
+    assert result.request_token is True
+    assert result.novelty_tier == "correction"
+    assert result.justification == "Need to correct a factual error."
+    retry_prompt = provider.messages_by_call[1][-1]["content"]
+    assert "previous response was not valid JSON" in retry_prompt
+    assert "ONLY valid JSON" in retry_prompt
+
+
+@pytest.mark.asyncio
+async def test_agent_runner_decide_raises_after_two_malformed_json_responses(
+    db: AsyncSession,
+):
+    """decide() should raise ValueError when both initial and retry responses are invalid."""
+    from engine.agent_runner import AgentRunner
+
+    session = await session_service.create_session(db, _valid_request())
+    participant = next(a for a in session.agents if a.role == "participant")
+
+    broadcaster = RecordingBroadcastManager()
+    provider = AlwaysMalformedDecideProvider()
+    llm_client = LLMClient(
+        providers={"fake": provider},
+        timeout_seconds=5.0,
+        rate_limit_backoff_seconds=0.0,
+    )
+    runner = AgentRunner(
+        session_id=session.id,
+        db=db,
+        llm_client=llm_client,
+        broadcast_manager=broadcaster,
+    )
+    agent_ctx = AgentContext(
+        id=participant.id,
+        display_name=participant.display_name,
+        persona_description=participant.persona_description,
+        expertise=participant.expertise,
+        llm_provider=participant.llm_provider,
+        llm_model=participant.llm_model,
+        llm_config=participant.llm_config,
+        role=participant.role,
+    )
+    bundle = ContextBundle(
+        topic=session.topic,
+        prompt="Should we split the service now?",
+        supporting_context=session.supporting_context,
+        agent=agent_ctx,
+        current_thought="Only speak when justified.",
+        transcript=[],
+        round_index=1,
+        turn_index=1,
+    )
+
+    with pytest.raises(ValueError, match="not valid JSON"):
+        await runner.decide(agent_ctx, bundle)
+
+    assert provider.calls == 2
+
+
+# ---------------------------------------------------------------------------
 # Integration tests: full orchestrator run including update/decide phases
 # ---------------------------------------------------------------------------
 
@@ -390,6 +581,61 @@ async def test_orchestrator_broadcasts_update_start_and_end(db: AsyncSession):
 
 
 @pytest.mark.asyncio
+async def test_orchestrator_update_failure_still_emits_update_end_for_failing_agent(
+    db: AsyncSession,
+):
+    """A failed update must still emit UPDATE_END and must not abort the orchestration run."""
+    session = await session_service.create_session(db, _valid_request_three_participants())
+    participant_ids = {
+        agent.display_name: agent.id
+        for agent in session.agents
+        if agent.role == "participant"
+    }
+    session_factory = async_sessionmaker(
+        bind=db.bind, class_=AsyncSession, expire_on_commit=False
+    )
+    broadcaster = RecordingBroadcastManager()
+    orchestrator = _make_orchestrator(
+        session.id, session_factory, broadcaster, UpdateFailureProvider()
+    )
+
+    await orchestrator.run(prompt="Which architecture should we choose?")
+
+    token_granted = broadcaster.events_of_type("TOKEN_GRANTED")[0]
+    speaker_id = token_granted["agent_id"]
+    non_speakers = {
+        participant_id
+        for participant_id in participant_ids.values()
+        if participant_id != speaker_id
+    }
+
+    update_start_ids = [event["agent_id"] for event in broadcaster.events_of_type("UPDATE_START")]
+    update_end_ids = [event["agent_id"] for event in broadcaster.events_of_type("UPDATE_END")]
+
+    assert set(update_start_ids) == non_speakers
+    assert set(update_end_ids) == non_speakers
+    assert participant_ids["Bob"] in update_end_ids
+    assert broadcaster.event_types().count("ARGUMENT_POSTED") == 1
+
+    async with session_factory() as verify_db:
+        thoughts_result = await verify_db.execute(
+            select(Thought).where(Thought.session_id == session.id)
+        )
+        thoughts = list(thoughts_result.scalars().all())
+        bob_thoughts_result = await verify_db.execute(
+            select(Thought).where(
+                Thought.session_id == session.id,
+                Thought.agent_id == participant_ids["Bob"],
+            )
+        )
+        bob_thoughts = list(bob_thoughts_result.scalars().all())
+
+    # Three initial think thoughts + only one successful update thought.
+    assert len(thoughts) == 4
+    assert len(bob_thoughts) == 1
+
+
+@pytest.mark.asyncio
 async def test_orchestrator_update_start_end_bracket_llm_call(db: AsyncSession):
     """UPDATE_START must appear before UPDATE_END in the event stream."""
     session = await session_service.create_session(db, _valid_request())
@@ -407,6 +653,42 @@ async def test_orchestrator_update_start_end_bracket_llm_call(db: AsyncSession):
     start_idx = next(i for i, e in enumerate(events) if e["type"] == "UPDATE_START")
     end_idx = next(i for i, e in enumerate(events) if e["type"] == "UPDATE_END")
     assert start_idx < end_idx
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_with_three_participants_updates_and_decides_for_two_non_speakers(
+    db: AsyncSession,
+):
+    """With 3 participants, update/decide phases should fan out to exactly 2 non-speakers."""
+    session = await session_service.create_session(db, _valid_request_three_participants())
+    session_factory = async_sessionmaker(
+        bind=db.bind, class_=AsyncSession, expire_on_commit=False
+    )
+    broadcaster = RecordingBroadcastManager()
+    provider = CountingSpec201Provider()
+    orchestrator = _make_orchestrator(session.id, session_factory, broadcaster, provider)
+
+    await orchestrator.run(prompt="Which architecture?")
+
+    assert provider.decide_call_count == 2
+    assert broadcaster.event_types().count("UPDATE_START") == 2
+    assert broadcaster.event_types().count("UPDATE_END") == 2
+    assert broadcaster.event_types().count("TOKEN_REQUEST") == 1
+
+    async with session_factory() as verify_db:
+        thoughts_result = await verify_db.execute(
+            select(Thought).where(Thought.session_id == session.id)
+        )
+        thoughts = list(thoughts_result.scalars().all())
+        queue_entries_result = await verify_db.execute(
+            select(QueueEntry).where(QueueEntry.session_id == session.id)
+        )
+        queue_entries = list(queue_entries_result.scalars().all())
+
+    # 3 think thoughts + 2 update thoughts.
+    assert len(thoughts) == 5
+    # 3 initial queue entries + 1 decide re-entry.
+    assert len(queue_entries) == 4
 
 
 @pytest.mark.asyncio
