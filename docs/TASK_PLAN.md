@@ -53,6 +53,7 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 - [x] `agent.ts` — `Agent`, `AgentRole`, `AgentPreset`, `QueueEntry`
 - [x] `events.ts` — union type `RoundTableEvent` covering all WS event types
 - [x] `api.ts` — all REST request/response interfaces
+- [x] Add matching Pydantic schemas in `backend/schemas/` for contract parity
 
 **Done when:** Types are importable from `frontend` without errors and Pydantic schemas in `backend/schemas/` match.
 
@@ -88,6 +89,13 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 - [x] Add `NEXT_PUBLIC_USE_MOCK` env flag that activates MSW + simulator
 
 **Done when:** Frontend loads, hits mock endpoints, and receives fixture data without a running backend.
+
+---
+
+### Phase 0 Review Notes (2026-02-28 · Recheck)
+
+- [x] Resolved since last review: `frontend/.env.example` is now tracked, `backend/schemas/` has been added in the workspace, and MSW handlers now cover the API client endpoints.
+- [x] `MSWProvider` creates and exposes `WSSimulator`, and `frontend/src/app/page.tsx` calls `simulator.start(...)` on mount, proving both mock REST and WS simulator activation.
 
 ---
 
