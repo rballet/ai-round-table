@@ -44,7 +44,7 @@ Rules:
 - Use `page.waitForSelector` with generous timeouts for WS-driven updates
 
 ## When Invoked
-1. Read the spec from `TASK_PLAN.md`
+1. Read the spec from `docs/TASK_PLAN.md`
 2. Read the implemented code
 3. Write tests following the patterns above
 4. Run the tests: `cd backend && pytest tests/test_<module>.py -v`

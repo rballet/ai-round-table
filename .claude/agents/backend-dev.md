@@ -43,7 +43,7 @@ After any DB write that changes session state, broadcast the corresponding WS ev
 - Never let agent errors crash the orchestration loop.
 
 ## When Implementing a Spec
-1. Read the spec from `TASK_PLAN.md`
+1. Read the spec from `docs/TASK_PLAN.md`
 2. Read the relevant existing modules for context
 3. Implement, then run: `cd backend && python -m pytest tests/ -x`
 4. Fix failures before returning

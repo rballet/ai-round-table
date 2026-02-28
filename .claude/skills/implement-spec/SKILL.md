@@ -11,7 +11,7 @@ Implement the spec identified by: $ARGUMENTS
 
 ## Steps
 
-1. **Read the spec**: find `SPEC-$ARGUMENTS` in `TASK_PLAN.md` and read it fully
+1. **Read the spec**: find `SPEC-$ARGUMENTS` in `docs/TASK_PLAN.md` and read it fully
 
 2. **Determine track**:
    - Suffix `-BE` → delegate to `backend-dev` subagent

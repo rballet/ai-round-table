@@ -62,6 +62,6 @@ Any change to `shared/types/` MUST be followed immediately by:
 5. `shared/types/` is the source of truth — Pydantic and MSW derive from it
 
 ## Spec References
-- PRD: `PRD.md`
-- Technical design: `ARCHITECTURE.md`
-- Task plan: `TASK_PLAN.md`
+- PRD: `docs/PRD.md`
+- Technical design: `docs/ARCHITECTURE.md`
+- Task plan: `docs/TASK_PLAN.md`

@@ -18,4 +18,4 @@ Add a new LLM provider: $ARGUMENTS
 5. Add the provider as an option in `frontend/components/setup/AgentConfigurator.tsx` (the provider dropdown)
 6. Add default model options for this provider in the same component
 7. Run `cd backend && python -m pytest tests/test_llm_client.py -v` — add a test for the new provider using mocked HTTP responses
-8. Update `ARCHITECTURE.md` dependencies section if a new package is needed
+8. Update `docs/ARCHITECTURE.md` dependencies section if a new package is needed

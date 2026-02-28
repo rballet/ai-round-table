@@ -37,7 +37,7 @@ When `NEXT_PUBLIC_USE_MOCK=true`:
 - Agent status changes announced via `aria-live` regions
 
 ## When Implementing a Spec
-1. Read the spec from `TASK_PLAN.md`
+1. Read the spec from `docs/TASK_PLAN.md`
 2. Check `shared/types/` for the relevant types
 3. Implement against MSW mocks
 4. Run: `cd frontend && npm run build` — must pass with no type errors
