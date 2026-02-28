@@ -5,11 +5,25 @@ export const handlers = [
 
     http.get('/sessions', () => HttpResponse.json({ sessions: [] })),
 
-    http.post('/sessions', () => HttpResponse.json({
-        id: "sess_mock_123",
-        status: "configured",
-        created_at: new Date().toISOString()
-    }, { status: 201 })),
+    http.post('/sessions', async ({ request }) => {
+        const body = await request.json() as { topic?: string; supporting_context?: string; config?: object };
+        return HttpResponse.json({
+            id: "sess_mock_123",
+            topic: body.topic ?? "Mocked discussion topic",
+            supporting_context: body.supporting_context ?? null,
+            status: "configured",
+            config: body.config ?? {
+                max_rounds: 10,
+                convergence_majority: 0.7,
+                priority_weights: { recency: 1.0, novelty: 1.0, role: 1.0 },
+                thought_inspector_enabled: false
+            },
+            created_at: new Date().toISOString(),
+            ended_at: null,
+            termination_reason: null,
+            agents: []
+        }, { status: 201 });
+    }),
 
     http.post('/sessions/:id/start', () => HttpResponse.json({
         session_id: "sess_mock_123",
@@ -19,9 +33,20 @@ export const handlers = [
     http.get('/sessions/:id', ({ params }) => HttpResponse.json({
         id: params.id,
         topic: "Mocked discussion topic",
+        supporting_context: null,
         status: "running",
-        config: {},
-        agents: [],
+        config: {
+            max_rounds: 10,
+            convergence_majority: 0.7,
+            priority_weights: { recency: 1.0, novelty: 1.0, role: 1.0 },
+            thought_inspector_enabled: false
+        },
+        created_at: new Date().toISOString(),
+        ended_at: null,
+        termination_reason: null,
+        rounds_elapsed: 0,
+        agent_count: 0,
+        agents: []
     })),
 
     // New mocks
