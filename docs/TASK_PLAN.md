@@ -224,13 +224,13 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 **Track:** Backend (builds on SPEC-104)
 
-- [ ] Implement `update.py` prompt builder
-- [ ] Implement `AgentRunner.update(agent, context_bundle)` — updates Thought, saves new version
-- [ ] Implement `SessionOrchestrator._phase_update_all()` — parallel updates for all non-active agents
-- [ ] Implement `SessionOrchestrator._phase_decide_all()` — parallel decide calls, re-queue if yes
-- [ ] Broadcast `UPDATE_START/END`, `THOUGHT_UPDATED` (if inspector enabled), `TOKEN_REQUEST`, `QUEUE_UPDATED`
-- [ ] Normalize novelty-tier contract before broadcast (`shared/types`, backend prompt parsing, and docs must agree on a single enum set, including whether `correction` or `factual_correction` is canonical)
-- [ ] Tests: unit tests for update/decide prompt handling + integration test covering argue → update/decide → queue re-entry and WS emissions (`UPDATE_START/END`, `TOKEN_REQUEST`, `QUEUE_UPDATED`)
+- [x] Implement `update.py` prompt builder
+- [x] Implement `AgentRunner.update(agent, context_bundle)` — updates Thought, saves new version
+- [x] Implement `SessionOrchestrator._phase_update_all()` — parallel updates for all non-active agents
+- [x] Implement `SessionOrchestrator._phase_decide_all()` — parallel decide calls, re-queue if yes
+- [x] Broadcast `UPDATE_START/END`, `THOUGHT_UPDATED` (if inspector enabled), `TOKEN_REQUEST`, `QUEUE_UPDATED`
+- [x] Normalize novelty-tier contract before broadcast (`correction` is canonical, matches `shared/types/agent.ts`)
+- [x] Tests: unit tests for update/decide prompt handling + integration test covering argue → update/decide → queue re-entry and WS emissions (`UPDATE_START/END`, `TOKEN_REQUEST`, `QUEUE_UPDATED`)
 
 **Done when:** After each argument, all other agents update their thoughts and submit new queue entries.
 
