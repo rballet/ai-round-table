@@ -1,7 +1,13 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { WSSimulator } from './simulator';
+
+export const WSSimulatorContext = createContext<WSSimulator | null>(null);
+
+export function useWSSimulator() {
+    return useContext(WSSimulatorContext);
+}
 
 export function MSWProvider({ children }: { children: React.ReactNode }) {
     const [isReady, setIsReady] = useState(false);
@@ -38,5 +44,9 @@ export function MSWProvider({ children }: { children: React.ReactNode }) {
         return null; // Or a global loading spinner
     }
 
-    return <>{children}</>;
+    return (
+        <WSSimulatorContext.Provider value={simulatorRef.current}>
+            {children}
+        </WSSimulatorContext.Provider>
+    );
 }
