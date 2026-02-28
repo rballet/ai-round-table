@@ -270,16 +270,16 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 **Track:** Frontend (parallel with SPEC-201/202)
 
-- [ ] `QueuePanel` component — ordered list of queued agents with priority score bars and novelty tier badges
-- [ ] Animates on `QUEUE_UPDATED` events — entries slide in/out
-- [ ] `TokenChip` component — SVG chip that animates from one seat to another on `TOKEN_GRANTED`
-- [ ] Agent status transitions driven by events:
+- [x] `QueuePanel` component — ordered list of queued agents with priority score bars and novelty tier badges
+- [x] Animates on `QUEUE_UPDATED` events — entries slide in/out
+- [x] `TokenChip` component — SVG chip that animates from one seat to another on `TOKEN_GRANTED`
+- [x] Agent status transitions driven by events:
   - `THINK_START` → thinking spinner
   - `TOKEN_GRANTED` → active glow + highlight
   - `UPDATE_START` → subtle update pulse
   - `TOKEN_REQUEST` → hand-raise indicator
-- [ ] `SessionStatus` bar — current round / max rounds, convergence status indicator
-- [ ] WS Simulator extended to emit the full event sequence for a 2-round discussion
+- [x] `SessionStatus` bar — current round / max rounds, convergence status indicator
+- [x] WS Simulator extended to emit the full event sequence for a 2-round discussion
 
 **Done when:** The simulator runs a complete fake discussion and every agent status, token movement, and queue change is reflected correctly in the UI.
 
@@ -289,9 +289,12 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 **Track:** Frontend (parallel with SPEC-202/203)
 
-- [ ] `ArgumentBubble` — expand/collapse, agent role badge, round/turn label
+- [ ] `ArgumentBubble` — expand/collapse
+- [ ] `ArgumentBubble` — agent role badge
+- [x] `ArgumentBubble` — round/turn label (already rendered in feed cards)
 - [ ] Auto-scroll to latest argument, pause auto-scroll when user scrolls up
-- [ ] `SESSION_END` event triggers summary overlay/panel
+- [x] WS Simulator emits `SESSION_END` + `SUMMARY_POSTED` in the 2-round flow (from SPEC-204)
+- [ ] `SESSION_END` / `SUMMARY_POSTED` events trigger summary overlay/panel
 - [ ] Summary rendered as formatted Markdown
 - [ ] Termination reason badge (consensus / cap / host)
 

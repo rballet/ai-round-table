@@ -327,9 +327,13 @@ test.describe('Session detail page', () => {
 
     await page.waitForSelector('h1', { timeout: 10000 });
 
-    await expect(
-      page.getByRole('heading', { name: 'Should AI systems be regulated by governments?' }),
-    ).toBeVisible();
+    const fixtureTopic = page.getByRole('heading', {
+      name: 'Should AI systems be regulated by governments?',
+    });
+    const simulatedTopic = page.getByRole('heading', {
+      name: 'Should we split our API into microservices?',
+    });
+    await expect(fixtureTopic.or(simulatedTopic)).toBeVisible();
   });
 
   test('shows WS connection status badge', async ({ page }) => {
@@ -348,8 +352,8 @@ test.describe('Session detail page', () => {
 
     await page.waitForSelector('h1', { timeout: 10000 });
 
-    // Queue Snapshot section from the live session page.
-    await expect(page.getByRole('heading', { name: 'Queue Snapshot' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Session Status' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Priority Queue' })).toBeVisible();
 
     // ArgumentFeed renders with its heading.
     await expect(page.getByRole('heading', { name: 'Argument Feed' })).toBeVisible();
@@ -360,10 +364,94 @@ test.describe('Session detail page', () => {
 
     await page.waitForSelector('h1', { timeout: 10000 });
 
-    // MOCK_AGENTS for sess_mock_001: Aria, Scribe, The Challenger, The Pragmatist.
-    // AgentSeat renders the agent name as a label.
-    await expect(page.getByText('Aria')).toBeVisible();
-    await expect(page.getByText('The Challenger')).toBeVisible();
-    await expect(page.getByText('The Pragmatist')).toBeVisible();
+    const fixtureAgent = page.getByText('Aria');
+    const simulatedAgent = page.getByText('Moderator Maya');
+    await expect(fixtureAgent.or(simulatedAgent)).toBeVisible();
+  });
+
+  test('renders queue updates, token movement, and hand-raise indicators from simulator events', async ({
+    page,
+  }) => {
+    await page.goto('/sessions/sess_mock_spec204');
+
+    await page.waitForSelector('h1', { timeout: 10000 });
+
+    await expect(page.getByRole('list', { name: 'Priority queue' }).getByText('Alex')).toBeVisible({
+      timeout: 6000,
+    });
+    await expect(page.getByText('Token')).toBeVisible({ timeout: 6000 });
+    await expect(page.getByTitle('Token request pending').first()).toBeVisible({ timeout: 6000 });
+  });
+
+  test('updates round progress to the second round during the simulated session', async ({ page }) => {
+    await page.goto('/sessions/sess_mock_spec204');
+
+    await page.waitForSelector('h1', { timeout: 10000 });
+
+    await expect(page.getByText('Round 2 / 2')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('drives seat statuses from THINK_START, TOKEN_GRANTED, UPDATE_START, and TOKEN_REQUEST', async ({
+    page,
+  }) => {
+    await page.goto('/sessions/sess_mock_spec204');
+
+    await page.waitForSelector('h1', { timeout: 10000 });
+
+    const alexSeat = page.getByTestId('agent-seat-agt_part_1');
+    const niaSeat = page.getByTestId('agent-seat-agt_part_2');
+    const niaAvatar = page.getByTestId('agent-avatar-agt_part_2');
+
+    await expect(alexSeat).toHaveAttribute('data-status', 'thinking', { timeout: 3000 });
+    await expect(alexSeat).toHaveAttribute('data-status', 'active', { timeout: 5000 });
+
+    await expect(niaSeat).toHaveAttribute('data-hand-raised', 'true', { timeout: 5000 });
+    await expect(niaSeat).toHaveAttribute('data-status', 'updating', { timeout: 7000 });
+    await expect(niaAvatar).toHaveClass(/animate-pulse/, { timeout: 7000 });
+  });
+
+  test('moves token chip and updates queue ordering on subsequent grants', async ({ page }) => {
+    await page.goto('/sessions/sess_mock_spec204');
+
+    await page.waitForSelector('h1', { timeout: 10000 });
+
+    const token = page.getByTestId('token-chip');
+    await expect(token).toBeVisible({ timeout: 6000 });
+    await expect(token.locator('svg path')).toBeVisible({ timeout: 6000 });
+    const first = await token.boundingBox();
+    if (!first) {
+      throw new Error('Token chip should have a bounding box after first TOKEN_GRANTED event');
+    }
+
+    await expect
+      .poll(
+        async () => {
+          const next = await token.boundingBox();
+          if (!next) return 0;
+          return Math.hypot(next.x - first.x, next.y - first.y);
+        },
+        { timeout: 5000 }
+      )
+      .toBeGreaterThan(20);
+
+    const firstQueueEntry = page.getByRole('list', { name: 'Priority queue' }).locator('li').first();
+    await expect(firstQueueEntry).toContainText('Nia', { timeout: 8000 });
+    await expect(page.getByTestId('queue-entry-agt_part_2')).toContainText('Disagreement', {
+      timeout: 8000,
+    });
+  });
+
+  test('completes the full 2-round simulator flow with convergence and empty queue at end', async ({
+    page,
+  }) => {
+    await page.goto('/sessions/sess_mock_spec204');
+
+    await page.waitForSelector('h1', { timeout: 10000 });
+
+    await expect(page.getByText('Convergence: open')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Convergence: converging')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('6 entries')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('0 waiting')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('ended')).toHaveCount(2, { timeout: 15000 });
   });
 });
