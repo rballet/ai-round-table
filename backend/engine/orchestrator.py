@@ -31,6 +31,20 @@ class SessionOrchestrator:
         self._session_factory = session_factory
         self._broadcast_manager = broadcast_manager
         self._llm_client = llm_client or LLMClient()
+        self._pause_event = asyncio.Event()
+        self._pause_event.set()
+        self._termination_flag = False
+        self._termination_reason: str | None = None
+
+    def pause(self) -> None:
+        self._pause_event.clear()
+
+    def resume(self) -> None:
+        self._pause_event.set()
+
+    def end(self) -> None:
+        self._termination_flag = True
+        self._termination_reason = "host"
 
     async def run(self, prompt: str) -> None:
         async with self._session_factory() as db:
@@ -80,16 +94,46 @@ class SessionOrchestrator:
             moderator=moderator,
             moderator_state=moderator_state,
         )
-        await self._phase_single_argue_turn(
-            topic=topic,
-            prompt=prompt,
-            supporting_context=supporting_context,
-            participants=participants,
-            queue_manager=queue_manager,
-            moderator=moderator,
-            moderator_state=moderator_state,
-            config=config,
-        )
+        max_rounds = 0
+        if isinstance(config, dict) and "max_rounds" in config:
+            try:
+                max_rounds = int(config["max_rounds"])
+            except (ValueError, TypeError):
+                pass
+
+        while not self._termination_flag:
+            await self._pause_event.wait()
+            if self._termination_flag:
+                break
+
+            current_round = (moderator_state.total_turns_elapsed // len(participants)) + 1
+            if max_rounds > 0 and current_round > max_rounds:
+                self._termination_flag = True
+                self._termination_reason = "cap"
+                break
+
+            success = await self._phase_single_argue_turn(
+                topic=topic,
+                prompt=prompt,
+                supporting_context=supporting_context,
+                participants=participants,
+                queue_manager=queue_manager,
+                moderator=moderator,
+                moderator_state=moderator_state,
+                config=config,
+            )
+            if not success:
+                break
+
+        scribes = [a for a in agents if a.role == "scribe"]
+        if scribes:
+            await self._phase_scribe(
+                topic=topic,
+                prompt=prompt,
+                supporting_context=supporting_context,
+                scribe=scribes[0],
+                termination_reason=self._termination_reason or "cap",
+            )
 
     async def _phase_think(
         self,
@@ -174,18 +218,18 @@ class SessionOrchestrator:
         moderator: ModeratorEngine,
         moderator_state: ModeratorState,
         config: dict,
-    ) -> None:
+    ) -> bool:
         queued_agent = await queue_manager.pop()
         if queued_agent is None:
-            return
+            return False
 
         participants_by_id = {agent.id: agent for agent in participants}
         speaker = participants_by_id.get(queued_agent.agent_id)
         if speaker is None:
-            return
+            return False
 
         turn_index = moderator_state.total_turns_elapsed + 1
-        round_index = 1
+        round_index = ((turn_index - 1) // len(participants)) + 1
 
         await self._emit_event(
             "TOKEN_GRANTED",
@@ -266,6 +310,7 @@ class SessionOrchestrator:
             round_index=round_index,
             turn_index=turn_index,
         )
+        return True
 
     async def _phase_update_all(
         self,
@@ -480,6 +525,53 @@ class SessionOrchestrator:
             **payload,
         }
         await self._broadcast_manager.broadcast(self._session_id, event)
+
+    async def _phase_scribe(
+        self,
+        *,
+        topic: str,
+        prompt: str,
+        supporting_context: str | None,
+        scribe: AgentContext,
+        termination_reason: str,
+    ) -> None:
+        async with self._session_factory() as db:
+            runner = AgentRunner(
+                session_id=self._session_id,
+                db=db,
+                llm_client=self._llm_client,
+                broadcast_manager=self._broadcast_manager,
+            )
+            transcript = await argument_service.list_arguments_for_session(
+                db, session_id=self._session_id
+            )
+            context_bundle = ContextBundle(
+                topic=topic,
+                prompt=prompt,
+                supporting_context=supporting_context,
+                agent=scribe,
+                transcript=transcript,
+                round_index=0,
+                turn_index=0,
+            )
+            summary = await runner.scribe(
+                scribe, context_bundle, termination_reason
+            )
+
+        payload = {
+            "summary": {
+                "id": summary.id,
+                "session_id": summary.session_id,
+                "termination_reason": summary.termination_reason,
+                "content": summary.content,
+                "created_at": summary.created_at.isoformat() if hasattr(summary.created_at, "isoformat") else str(summary.created_at),
+            }
+        }
+        await self._emit_event("SUMMARY_POSTED", payload)
+        await self._emit_event(
+            "SESSION_END",
+            {"termination_reason": termination_reason},
+        )
 
     @staticmethod
     def _to_agent_context(agent: Agent) -> AgentContext:

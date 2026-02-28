@@ -138,6 +138,10 @@ async def start_session(
             status_code=409, detail="Session is already running"
         )
 
+    if not hasattr(request.app.state, "active_orchestrators"):
+        request.app.state.active_orchestrators = {}
+    active_orchestrators: dict[str, SessionOrchestrator] = request.app.state.active_orchestrators
+
     session_factory = getattr(
         request.app.state, "session_factory", AsyncSessionLocal
     )
@@ -149,12 +153,62 @@ async def start_session(
     )
     task = asyncio.create_task(orchestrator.run(prompt=payload.prompt))
     active_tasks[session_id] = task
+    active_orchestrators[session_id] = orchestrator
 
     def _cleanup(_task: asyncio.Task, sid: str = session_id) -> None:
         active_tasks.pop(sid, None)
+        active_orchestrators.pop(sid, None)
 
     task.add_done_callback(_cleanup)
     return {"session_id": session_id, "status": "running"}
+
+
+@router.post("/{session_id}/pause", status_code=200)
+async def pause_session(
+    session_id: str,
+    request: Request,
+) -> dict[str, str]:
+    if not hasattr(request.app.state, "active_orchestrators"):
+        raise HTTPException(status_code=404, detail="Session not running")
+        
+    orchestrator = request.app.state.active_orchestrators.get(session_id)
+    if orchestrator is None:
+        raise HTTPException(status_code=404, detail="Session not running")
+        
+    orchestrator.pause()
+    return {"session_id": session_id, "status": "paused"}
+
+
+@router.post("/{session_id}/resume", status_code=200)
+async def resume_session(
+    session_id: str,
+    request: Request,
+) -> dict[str, str]:
+    if not hasattr(request.app.state, "active_orchestrators"):
+        raise HTTPException(status_code=404, detail="Session not running")
+        
+    orchestrator = request.app.state.active_orchestrators.get(session_id)
+    if orchestrator is None:
+        raise HTTPException(status_code=404, detail="Session not running")
+        
+    orchestrator.resume()
+    return {"session_id": session_id, "status": "resumed"}
+
+
+@router.post("/{session_id}/end", status_code=200)
+async def end_session(
+    session_id: str,
+    request: Request,
+) -> dict[str, str]:
+    if not hasattr(request.app.state, "active_orchestrators"):
+        raise HTTPException(status_code=404, detail="Session not running")
+        
+    orchestrator = request.app.state.active_orchestrators.get(session_id)
+    if orchestrator is None:
+        raise HTTPException(status_code=404, detail="Session not running")
+        
+    orchestrator.end()
+    return {"session_id": session_id, "status": "ending"}
 
 
 @router.get("/{session_id}/transcript", response_model=TranscriptResponseSchema)

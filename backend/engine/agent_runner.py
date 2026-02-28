@@ -11,11 +11,13 @@ from engine.context import AgentContext, ContextBundle
 from llm.client import LLMClient
 from llm.prompts.argue import build_argue_messages
 from llm.prompts.decide import build_decide_messages
+from llm.prompts.scribe import build_scribe_messages
 from llm.prompts.think import build_think_messages
 from llm.prompts.update import build_update_messages
 from models.argument import Argument
+from models.summary import Summary
 from models.thought import Thought
-from services import argument_service, thought_service
+from services import argument_service, thought_service, session_service
 
 
 @dataclass(frozen=True)
@@ -102,6 +104,26 @@ class AgentRunner:
             session_id=self._session_id,
             agent_id=agent.id,
             content=completion,
+        )
+
+    async def scribe(
+        self,
+        agent: AgentContext,
+        context_bundle: ContextBundle,
+        termination_reason: str,
+    ) -> Summary:
+        completion = await self._llm_client.complete(
+            provider=agent.llm_provider,
+            model=agent.llm_model,
+            messages=build_scribe_messages(context_bundle),
+            config=agent.llm_config or {},
+        )
+        return await session_service.save_summary(
+            self._db,
+            session_id=self._session_id,
+            scribe_agent_id=agent.id,
+            content=completion,
+            termination_reason=termination_reason,
         )
 
     async def decide(

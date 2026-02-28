@@ -152,3 +152,36 @@ async def get_summary(db: AsyncSession, session_id: str) -> Summary | None:
     )
     return result.scalar_one_or_none()
 
+
+async def save_summary(
+    db: AsyncSession,
+    *,
+    session_id: str,
+    scribe_agent_id: str,
+    content: str,
+    termination_reason: str,
+) -> Summary:
+    summary_id = str(uuid.uuid4())
+    summary = Summary(
+        id=summary_id,
+        session_id=session_id,
+        scribe_agent_id=scribe_agent_id,
+        content=content,
+        termination_reason=termination_reason,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(summary)
+    
+    # Also update the session's terminated status
+    result = await db.execute(
+        select(Session).where(Session.id == session_id)
+    )
+    session = result.scalar_one_or_none()
+    if session:
+        session.status = "ended"
+        session.ended_at = datetime.now(timezone.utc)
+        session.termination_reason = termination_reason
+
+    await db.commit()
+    return summary
+

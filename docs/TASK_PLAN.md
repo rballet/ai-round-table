@@ -240,13 +240,13 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 **Track:** Backend (builds on SPEC-201)
 
-- [ ] Implement the full `while not should_terminate()` loop in `SessionOrchestrator`
-- [ ] Implement round counting (`round_index` increments when all agents have had one opportunity)
-- [ ] Implement hard turn cap check (rounds_elapsed ≥ max_rounds)
-- [ ] Implement `SessionOrchestrator._phase_scribe()` — grant token to Scribe, save Summary
-- [ ] `scribe.py` prompt builder — receives full transcript + moderator state
-- [ ] Implement `POST /sessions/{id}/pause` and `/resume` — sets an asyncio Event flag the loop checks
-- [ ] Implement `POST /sessions/{id}/end` — sets termination flag
+- [x] Implement the full `while not should_terminate()` loop in `SessionOrchestrator`
+- [x] Implement round counting (`round_index` increments when all agents have had one opportunity)
+- [x] Implement hard turn cap check (rounds_elapsed ≥ max_rounds)
+- [x] Implement `SessionOrchestrator._phase_scribe()` — grant token to Scribe, save Summary
+- [x] `scribe.py` prompt builder — receives full transcript + moderator state
+- [x] Implement `POST /sessions/{id}/pause` and `/resume` — sets an asyncio Event flag the loop checks
+- [x] Implement `POST /sessions/{id}/end` — sets termination flag
 
 **Done when:** A full session runs to completion (via cap) and produces a Summary in SQLite.
 
