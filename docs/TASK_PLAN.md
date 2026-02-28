@@ -34,12 +34,12 @@ Both tracks must be completed before Phase 1 begins. This phase is not paralleli
 
 Set up the project structure as defined in the technical design.
 
-- [ ] Initialise `backend/` with FastAPI + uvicorn
-- [ ] Initialise `frontend/` with Next.js (App Router, TypeScript, Tailwind)
-- [ ] Create `shared/types/` with placeholder type files
-- [ ] Add root `package.json` with workspaces for `frontend` and `shared`
-- [ ] Add `.env.example` files for both packages
-- [ ] Add `README.md` with setup instructions (install, dev, env vars)
+- [x] Initialise `backend/` with FastAPI + uvicorn
+- [x] Initialise `frontend/` with Next.js (App Router, TypeScript, Tailwind)
+- [x] Create `shared/types/` with placeholder type files
+- [x] Add root `package.json` with workspaces for `frontend` and `shared`
+- [x] Add `.env.example` files for both packages
+- [x] Add `README.md` with setup instructions (install, dev, env vars)
 
 **Done when:** `cd backend && uvicorn main:app` and `cd frontend && npm run dev` both run without errors.
 
@@ -49,10 +49,10 @@ Set up the project structure as defined in the technical design.
 
 Define all TypeScript types in `shared/types/`. These are the contract — both tracks depend on them.
 
-- [ ] `session.ts` — `Session`, `SessionStatus`, `SessionConfig`
-- [ ] `agent.ts` — `Agent`, `AgentRole`, `AgentPreset`, `QueueEntry`
-- [ ] `events.ts` — union type `RoundTableEvent` covering all WS event types
-- [ ] `api.ts` — all REST request/response interfaces
+- [x] `session.ts` — `Session`, `SessionStatus`, `SessionConfig`
+- [x] `agent.ts` — `Agent`, `AgentRole`, `AgentPreset`, `QueueEntry`
+- [x] `events.ts` — union type `RoundTableEvent` covering all WS event types
+- [x] `api.ts` — all REST request/response interfaces
 
 **Done when:** Types are importable from `frontend` without errors and Pydantic schemas in `backend/schemas/` match.
 
@@ -60,11 +60,11 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 ### TASK-003 · Backend: database setup
 
-- [ ] Configure SQLAlchemy async engine with `aiosqlite`
-- [ ] Enable WAL mode on SQLite
-- [ ] Define all ORM models (Session, Agent, Thought, Argument, QueueEntry, ModeratorState, Summary)
-- [ ] Set up Alembic and generate initial migration
-- [ ] Write `database.py` with `get_db` async dependency
+- [x] Configure SQLAlchemy async engine with `aiosqlite`
+- [x] Enable WAL mode on SQLite
+- [x] Define all ORM models (Session, Agent, Thought, Argument, QueueEntry, ModeratorState, Summary)
+- [x] Set up Alembic and generate initial migration
+- [x] Write `database.py` with `get_db` async dependency
 
 **Done when:** `alembic upgrade head` creates a valid `.db` file with all tables.
 
@@ -72,9 +72,9 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 ### TASK-004 · Backend: health check + CORS
 
-- [ ] `GET /health` returns `{ "status": "ok" }`
-- [ ] CORS configured for `http://localhost:3000`
-- [ ] WebSocket endpoint skeleton at `WS /sessions/{id}/stream` (accepts connection, does nothing yet)
+- [x] `GET /health` returns `{ "status": "ok" }`
+- [x] CORS configured for `http://localhost:3000`
+- [x] WebSocket endpoint skeleton at `WS /sessions/{id}/stream` (accepts connection, does nothing yet)
 
 **Done when:** Frontend can fetch `/health` and connect to the WS endpoint without errors.
 
@@ -82,10 +82,10 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 ### TASK-005 · Frontend: API client + mock infrastructure
 
-- [ ] Write typed `lib/api.ts` REST client wrapping `fetch`
-- [ ] Set up MSW with `lib/mock/handlers.ts` returning empty/fixture responses for all endpoints
-- [ ] Write `lib/mock/simulator.ts` WS simulator skeleton
-- [ ] Add `NEXT_PUBLIC_USE_MOCK` env flag that activates MSW + simulator
+- [x] Write typed `lib/api.ts` REST client wrapping `fetch`
+- [x] Set up MSW with `lib/mock/handlers.ts` returning empty/fixture responses for all endpoints
+- [x] Write `lib/mock/simulator.ts` WS simulator skeleton
+- [x] Add `NEXT_PUBLIC_USE_MOCK` env flag that activates MSW + simulator
 
 **Done when:** Frontend loads, hits mock endpoints, and receives fixture data without a running backend.
 
