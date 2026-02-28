@@ -141,12 +141,12 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 **Track:** Backend only
 
-- [ ] Implement `BaseLLMProvider` abstract class
-- [ ] Implement `OpenAIProvider` — wraps `openai` async client
-- [ ] Implement `AnthropicProvider` — wraps `anthropic` async client
-- [ ] Implement `LLMClient` with provider registry
-- [ ] Unit tests with mocked HTTP responses for both providers
-- [ ] Error handling: timeout (30s), rate limit (retry once with backoff), invalid response
+- [x] Implement `BaseLLMProvider` abstract class
+- [x] Implement `OpenAIProvider` — wraps `openai` async client
+- [x] Implement `AnthropicProvider` — wraps `anthropic` async client
+- [x] Implement `LLMClient` with provider registry
+- [x] Unit tests with mocked HTTP responses for both providers
+- [x] Error handling: timeout (30s), rate limit (retry once with backoff), invalid response
 
 **Done when:** `LLMClient.complete(provider, model, messages, config)` works for both providers and handles errors gracefully.
 
