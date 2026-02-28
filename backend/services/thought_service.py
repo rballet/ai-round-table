@@ -33,3 +33,21 @@ async def save_thought(
     await db.commit()
     await db.refresh(thought)
     return thought
+
+
+async def get_latest_thought(
+    db: AsyncSession,
+    *,
+    session_id: str,
+    agent_id: str,
+) -> Thought | None:
+    result = await db.execute(
+        select(Thought)
+        .where(
+            Thought.session_id == session_id,
+            Thought.agent_id == agent_id,
+        )
+        .order_by(Thought.version.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()

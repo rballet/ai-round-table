@@ -10,9 +10,12 @@ from sqlalchemy.orm import selectinload
 from engine.agent_runner import AgentRunner
 from engine.broadcast_manager import BroadcastManager
 from engine.context import AgentContext, ContextBundle
+from engine.moderator import ModeratorEngine, ModeratorState, QueueCandidate
+from engine.queue_manager import QueueManager
 from llm.client import LLMClient
 from models.agent import Agent
 from models.session import Session
+from services import argument_service, thought_service
 
 
 class SessionOrchestrator:
@@ -48,6 +51,16 @@ class SessionOrchestrator:
             config = session.config
             agents = [self._to_agent_context(agent) for agent in session.agents]
             participants = [a for a in agents if a.role == "participant"]
+            priority_weights = {}
+            if isinstance(config, dict):
+                priority_weights = config.get("priority_weights", {}) or {}
+
+        moderator = ModeratorEngine(priority_weights=priority_weights)
+        moderator_state = ModeratorState(total_turns_elapsed=0)
+        queue_manager = QueueManager(
+            session_id=self._session_id,
+            session_factory=self._session_factory,
+        )
 
         await self._broadcast_session_start(
             topic=topic,
@@ -60,6 +73,20 @@ class SessionOrchestrator:
             prompt=prompt,
             supporting_context=supporting_context,
             participants=participants,
+        )
+        await self._phase_init_queue(
+            participants=participants,
+            queue_manager=queue_manager,
+            moderator=moderator,
+            moderator_state=moderator_state,
+        )
+        await self._phase_single_argue_turn(
+            topic=topic,
+            prompt=prompt,
+            supporting_context=supporting_context,
+            participants=participants,
+            queue_manager=queue_manager,
+            moderator_state=moderator_state,
         )
 
     async def _phase_think(
@@ -107,6 +134,130 @@ class SessionOrchestrator:
             )
             await runner.think(agent, context_bundle)
 
+    async def _phase_init_queue(
+        self,
+        *,
+        participants: list[AgentContext],
+        queue_manager: QueueManager,
+        moderator: ModeratorEngine,
+        moderator_state: ModeratorState,
+    ) -> None:
+        for agent in participants:
+            score = moderator.compute_priority_score(
+                QueueCandidate(
+                    agent_id=agent.id,
+                    novelty_tier="first_argument",
+                    role=agent.role,
+                    justification="Initial speaking turn",
+                ),
+                moderator_state,
+            )
+            await queue_manager.push(
+                agent_id=agent.id,
+                agent_name=agent.display_name,
+                novelty_tier="first_argument",
+                priority_score=score,
+                justification="Initial speaking turn",
+            )
+        await self._broadcast_queue_snapshot(queue_manager)
+
+    async def _phase_single_argue_turn(
+        self,
+        *,
+        topic: str,
+        prompt: str,
+        supporting_context: str | None,
+        participants: list[AgentContext],
+        queue_manager: QueueManager,
+        moderator_state: ModeratorState,
+    ) -> None:
+        queued_agent = await queue_manager.pop()
+        if queued_agent is None:
+            return
+
+        participants_by_id = {agent.id: agent for agent in participants}
+        speaker = participants_by_id.get(queued_agent.agent_id)
+        if speaker is None:
+            return
+
+        turn_index = moderator_state.total_turns_elapsed + 1
+        round_index = 1
+
+        await self._emit_event(
+            "TOKEN_GRANTED",
+            {
+                "agent_id": speaker.id,
+                "round_index": round_index,
+                "turn_index": turn_index,
+            },
+        )
+
+        async with self._session_factory() as db:
+            runner = AgentRunner(
+                session_id=self._session_id,
+                db=db,
+                llm_client=self._llm_client,
+                broadcast_manager=self._broadcast_manager,
+            )
+            latest_thought = await thought_service.get_latest_thought(
+                db,
+                session_id=self._session_id,
+                agent_id=speaker.id,
+            )
+            transcript = await argument_service.list_arguments_for_session(
+                db,
+                session_id=self._session_id,
+            )
+            context_bundle = ContextBundle(
+                topic=topic,
+                prompt=prompt,
+                supporting_context=supporting_context,
+                agent=speaker,
+                current_thought=(
+                    latest_thought.content if latest_thought is not None else None
+                ),
+                transcript=transcript,
+                round_index=round_index,
+                turn_index=turn_index,
+            )
+            argument = await runner.argue(speaker, context_bundle)
+
+        await self._emit_event(
+            "ARGUMENT_POSTED",
+            {
+                "argument": {
+                    "id": argument.id,
+                    "agent_id": speaker.id,
+                    "agent_name": speaker.display_name,
+                    "round_index": round_index,
+                    "turn_index": turn_index,
+                    "content": argument.content,
+                }
+            },
+        )
+        moderator_state.total_turns_elapsed = turn_index
+        moderator_state.last_turn_by_agent[speaker.id] = turn_index
+        await self._broadcast_queue_snapshot(queue_manager)
+
+    async def _broadcast_queue_snapshot(self, queue_manager: QueueManager) -> None:
+        snapshot = await queue_manager.snapshot()
+        await self._emit_event(
+            "QUEUE_UPDATED",
+            {
+                "queue": [
+                    {
+                        "agent_id": item.agent_id,
+                        "agent_name": item.agent_name,
+                        "priority_score": item.priority_score,
+                        "novelty_tier": item.novelty_tier,
+                        "justification": item.justification,
+                        "position": item.position,
+                    }
+                    for item in snapshot
+                ]
+            },
+        )
+
     async def _broadcast_session_start(
         self,
         *,
@@ -116,9 +267,6 @@ class SessionOrchestrator:
         agents: list[AgentContext],
     ) -> None:
         payload = {
-            "type": "SESSION_START",
-            "session_id": self._session_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
             "topic": topic,
             "prompt": prompt,
             "config": config,
@@ -131,7 +279,16 @@ class SessionOrchestrator:
                 for agent in agents
             ],
         }
-        await self._broadcast_manager.broadcast(self._session_id, payload)
+        await self._emit_event("SESSION_START", payload)
+
+    async def _emit_event(self, event_type: str, payload: dict) -> None:
+        event = {
+            "type": event_type,
+            "session_id": self._session_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            **payload,
+        }
+        await self._broadcast_manager.broadcast(self._session_id, event)
 
     @staticmethod
     def _to_agent_context(agent: Agent) -> AgentContext:

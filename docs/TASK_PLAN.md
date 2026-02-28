@@ -170,17 +170,17 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 **Track:** Backend only (builds on SPEC-103)
 
-- [ ] Implement `argue.py` prompt builder
-- [ ] Implement `AgentRunner.argue(agent, context_bundle)` — calls LLM, saves `Argument`
-- [ ] Implement `decide.py` prompt builder
-- [ ] Implement `AgentRunner.decide(agent, context_bundle)` — returns `DecideResult`
-- [ ] Implement `QueueManager` with `asyncio.PriorityQueue`
-- [ ] Implement `ModeratorEngine.compute_priority_score(entry, state)` 
-- [ ] One full turn loop: dequeue → argue → broadcast → return token
-- [ ] Milestone boundary: after think phase, execute exactly one dequeue/argue cycle, then stop (do not run full convergence loop yet)
-- [ ] Session state after milestone run remains `running` (discussion is incomplete and continues in later specs)
-- [ ] `QueueEntry` audit records written to SQLite on every push/pop
-- [ ] Tests: unit tests for prompt builders/queue scoring + integration test for think → one argue turn with WS events and DB persistence
+- [x] Implement `argue.py` prompt builder
+- [x] Implement `AgentRunner.argue(agent, context_bundle)` — calls LLM, saves `Argument`
+- [x] Implement `decide.py` prompt builder
+- [x] Implement `AgentRunner.decide(agent, context_bundle)` — returns `DecideResult`
+- [x] Implement `QueueManager` with `asyncio.PriorityQueue`
+- [x] Implement `ModeratorEngine.compute_priority_score(entry, state)` 
+- [x] One full turn loop: dequeue → argue → broadcast → return token
+- [x] Milestone boundary: after think phase, execute exactly one dequeue/argue cycle, then stop (do not run full convergence loop yet)
+- [x] Session state after milestone run remains `running` (discussion is incomplete and continues in later specs)
+- [x] `QueueEntry` audit records written to SQLite on every push/pop
+- [x] Tests: unit tests for prompt builders/queue scoring + integration test for think → one argue turn with WS events and DB persistence
 
 **Done when:** After the think phase, one agent is dequeued, argues once, the argument is saved and broadcast, queue audit writes exist, and tests cover the single-turn path.
 
@@ -195,8 +195,8 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 - [ ] `AgentSeat` component — avatar circle, name label, static status badge
 - [ ] `ArgumentFeed` component — scrollable list, `ArgumentBubble` for each entry
 - [ ] `useWebSocket` hook — connects to WS, dispatches events to Zustand store
-- [ ] `sessionStore` Zustand slice — handles `ARGUMENT_POSTED`, `THINK_START/END`, `TOKEN_GRANTED`
-- [ ] WS Simulator emits: `SESSION_START → THINK_START (×N) → THINK_END (×N) → TOKEN_GRANTED → ARGUMENT_POSTED`
+- [ ] `sessionStore` Zustand slice — handles `ARGUMENT_POSTED`, `THINK_START/END`, `TOKEN_GRANTED`, `QUEUE_UPDATED`
+- [ ] WS Simulator emits: `SESSION_START → THINK_START (×N) → THINK_END (×N) → QUEUE_UPDATED → TOKEN_GRANTED → ARGUMENT_POSTED → QUEUE_UPDATED`
 - [ ] All states visible: agent avatars react to simulator events (thinking spinner, active glow)
 
 **Done when:** Loading the page with `USE_MOCK=true` shows a populated table with animated agents responding to the simulated event sequence.

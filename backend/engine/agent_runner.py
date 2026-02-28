@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,9 +9,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from engine.broadcast_manager import BroadcastManager
 from engine.context import AgentContext, ContextBundle
 from llm.client import LLMClient
+from llm.prompts.argue import build_argue_messages
+from llm.prompts.decide import build_decide_messages
 from llm.prompts.think import build_think_messages
+from models.argument import Argument
 from models.thought import Thought
-from services import thought_service
+from services import argument_service, thought_service
+
+
+@dataclass(frozen=True)
+class DecideResult:
+    request_token: bool
+    novelty_tier: str
+    justification: str | None
 
 
 class AgentRunner:
@@ -48,6 +60,62 @@ class AgentRunner:
         finally:
             await self._broadcast("THINK_END", {"agent_id": agent.id})
 
+    async def argue(
+        self,
+        agent: AgentContext,
+        context_bundle: ContextBundle,
+    ) -> Argument:
+        completion = await self._llm_client.complete(
+            provider=agent.llm_provider,
+            model=agent.llm_model,
+            messages=build_argue_messages(context_bundle),
+            config=agent.llm_config or {},
+        )
+        return await argument_service.save_argument(
+            self._db,
+            session_id=self._session_id,
+            agent_id=agent.id,
+            round_index=context_bundle.round_index,
+            turn_index=context_bundle.turn_index,
+            content=completion,
+        )
+
+    async def decide(
+        self,
+        agent: AgentContext,
+        context_bundle: ContextBundle,
+    ) -> DecideResult:
+        messages = build_decide_messages(context_bundle)
+        completion = await self._llm_client.complete(
+            provider=agent.llm_provider,
+            model=agent.llm_model,
+            messages=messages,
+            config=agent.llm_config or {},
+        )
+        parsed = self._parse_decide_response(completion)
+        if parsed is not None:
+            return parsed
+
+        retry_messages = messages + [
+            {
+                "role": "user",
+                "content": (
+                    "Your previous response was not valid JSON. "
+                    "Respond with ONLY valid JSON."
+                ),
+            }
+        ]
+        retry_completion = await self._llm_client.complete(
+            provider=agent.llm_provider,
+            model=agent.llm_model,
+            messages=retry_messages,
+            config=agent.llm_config or {},
+        )
+        retry_parsed = self._parse_decide_response(retry_completion)
+        if retry_parsed is None:
+            raise ValueError("Decide response was not valid JSON.")
+        return retry_parsed
+
     async def _broadcast(self, event_type: str, payload: dict) -> None:
         event = {
             "type": event_type,
@@ -56,3 +124,22 @@ class AgentRunner:
             **payload,
         }
         await self._broadcast_manager.broadcast(self._session_id, event)
+
+    @staticmethod
+    def _parse_decide_response(raw: str) -> DecideResult | None:
+        try:
+            payload = json.loads(raw.strip())
+        except json.JSONDecodeError:
+            return None
+
+        request_token = bool(payload.get("request_token", False))
+        novelty_tier = str(payload.get("novelty_tier", "reinforcement"))
+        justification = payload.get("justification")
+        if justification is not None:
+            justification = str(justification).strip() or None
+
+        return DecideResult(
+            request_token=request_token,
+            novelty_tier=novelty_tier,
+            justification=justification,
+        )
