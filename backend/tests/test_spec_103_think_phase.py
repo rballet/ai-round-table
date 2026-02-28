@@ -5,6 +5,7 @@ from time import monotonic
 
 import pytest
 from fastapi import FastAPI, Request
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -295,3 +296,58 @@ async def test_start_session_endpoint_triggers_orchestrator_task(
 
     await asyncio.sleep(0.08)
     assert session.id not in app.state.orchestrator_tasks
+
+
+@pytest.mark.asyncio
+async def test_start_session_rejects_when_session_not_configured(
+    db: AsyncSession
+):
+    session = await session_service.create_session(db, _valid_request())
+    session_factory = async_sessionmaker(
+        bind=db.bind,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    client = LLMClient(
+        providers={"fake": StubProvider()},
+        timeout_seconds=1.0,
+        rate_limit_backoff_seconds=0.0,
+    )
+    broadcaster = RecordingBroadcastManager()
+    app = FastAPI()
+    app.state.orchestrator_tasks = {}
+    app.state.session_factory = session_factory
+    app.state.llm_client = client
+    app.state.broadcast_manager = broadcaster
+
+    request = Request(
+        {
+            "type": "http",
+            "app": app,
+            "method": "POST",
+            "path": f"/sessions/{session.id}/start",
+            "headers": [],
+        }
+    )
+
+    first = await start_session(
+        session_id=session.id,
+        payload=StartSessionRequestSchema(prompt="Round one"),
+        request=request,
+        db=db,
+    )
+    assert first == {"session_id": session.id, "status": "running"}
+
+    await asyncio.sleep(0.03)
+
+    async with session_factory() as second_request_db:
+        with pytest.raises(HTTPException) as exc_info:
+            await start_session(
+                session_id=session.id,
+                payload=StartSessionRequestSchema(prompt="Round two"),
+                request=request,
+                db=second_request_db,
+            )
+
+    assert exc_info.value.status_code == 409
+    assert "configured state" in exc_info.value.detail

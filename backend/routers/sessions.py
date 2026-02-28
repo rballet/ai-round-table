@@ -121,6 +121,11 @@ async def start_session(
     session = await session_service.get_session(db, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
+    if session.status != "configured":
+        raise HTTPException(
+            status_code=409,
+            detail="Session can only be started from configured state",
+        )
 
     active_tasks: dict[str, asyncio.Task] = request.app.state.orchestrator_tasks
     existing_task = active_tasks.get(session_id)

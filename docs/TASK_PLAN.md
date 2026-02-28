@@ -177,9 +177,12 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 - [ ] Implement `QueueManager` with `asyncio.PriorityQueue`
 - [ ] Implement `ModeratorEngine.compute_priority_score(entry, state)` 
 - [ ] One full turn loop: dequeue → argue → broadcast → return token
+- [ ] Milestone boundary: after think phase, execute exactly one dequeue/argue cycle, then stop (do not run full convergence loop yet)
+- [ ] Session state after milestone run remains `running` (discussion is incomplete and continues in later specs)
 - [ ] `QueueEntry` audit records written to SQLite on every push/pop
+- [ ] Tests: unit tests for prompt builders/queue scoring + integration test for think → one argue turn with WS events and DB persistence
 
-**Done when:** After the think phase, one agent is dequeued, argues, and the argument is saved and broadcast.
+**Done when:** After the think phase, one agent is dequeued, argues once, the argument is saved and broadcast, queue audit writes exist, and tests cover the single-turn path.
 
 ---
 

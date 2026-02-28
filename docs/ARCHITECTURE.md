@@ -105,7 +105,7 @@ backend/
 
 ### 2.2 Engine Layer Design
 
-The engine is the core of the system. Three classes coordinate the entire discussion loop:
+The engine is the core of the system. Three classes coordinate the discussion loop. Feature milestones may ship a subset of phases before the full loop is complete.
 
 **`SessionOrchestrator`** — owns the main async loop for one session. Created per session on `POST /sessions/{id}/start`. Runs until convergence or cap.
 
@@ -129,7 +129,7 @@ class SessionOrchestrator:
 
 **`ModeratorEngine`** — stateful. Owns the `QueueManager`, the claim registry, alignment map, and convergence logic. The only place where priority scoring happens.
 
-**`AgentRunner`** — stateless. Given an agent, a phase, and a context bundle, it calls the right prompt template and the right LLM provider. Returns a string. No side effects.
+**`AgentRunner`** — phase executor. Given an agent and a context bundle, it builds phase prompts, calls the right LLM provider, persists phase outputs via services (e.g., `Thought`, `Argument`), and emits phase WS events.
 
 ### 2.3 QueueManager
 
