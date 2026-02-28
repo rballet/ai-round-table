@@ -289,9 +289,12 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 **Track:** Frontend (parallel with SPEC-202/203)
 
-- [ ] `ArgumentBubble` — expand/collapse, agent role badge, round/turn label
+- [ ] `ArgumentBubble` — expand/collapse
+- [ ] `ArgumentBubble` — agent role badge
+- [x] `ArgumentBubble` — round/turn label (already rendered in feed cards)
 - [ ] Auto-scroll to latest argument, pause auto-scroll when user scrolls up
-- [ ] `SESSION_END` / `SUMMARY_POSTED` events trigger summary overlay/panel (events now emitted by the simulator from SPEC-204)
+- [x] WS Simulator emits `SESSION_END` + `SUMMARY_POSTED` in the 2-round flow (from SPEC-204)
+- [ ] `SESSION_END` / `SUMMARY_POSTED` events trigger summary overlay/panel
 - [ ] Summary rendered as formatted Markdown
 - [ ] Termination reason badge (consensus / cap / host)
 

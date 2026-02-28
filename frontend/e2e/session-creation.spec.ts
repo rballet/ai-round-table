@@ -390,4 +390,68 @@ test.describe('Session detail page', () => {
 
     await expect(page.getByText('Round 2 / 2')).toBeVisible({ timeout: 10000 });
   });
+
+  test('drives seat statuses from THINK_START, TOKEN_GRANTED, UPDATE_START, and TOKEN_REQUEST', async ({
+    page,
+  }) => {
+    await page.goto('/sessions/sess_mock_spec204');
+
+    await page.waitForSelector('h1', { timeout: 10000 });
+
+    const alexSeat = page.getByTestId('agent-seat-agt_part_1');
+    const niaSeat = page.getByTestId('agent-seat-agt_part_2');
+    const niaAvatar = page.getByTestId('agent-avatar-agt_part_2');
+
+    await expect(alexSeat).toHaveAttribute('data-status', 'thinking', { timeout: 3000 });
+    await expect(alexSeat).toHaveAttribute('data-status', 'active', { timeout: 5000 });
+
+    await expect(niaSeat).toHaveAttribute('data-hand-raised', 'true', { timeout: 5000 });
+    await expect(niaSeat).toHaveAttribute('data-status', 'updating', { timeout: 7000 });
+    await expect(niaAvatar).toHaveClass(/animate-pulse/, { timeout: 7000 });
+  });
+
+  test('moves token chip and updates queue ordering on subsequent grants', async ({ page }) => {
+    await page.goto('/sessions/sess_mock_spec204');
+
+    await page.waitForSelector('h1', { timeout: 10000 });
+
+    const token = page.getByTestId('token-chip');
+    await expect(token).toBeVisible({ timeout: 6000 });
+    await expect(token.locator('svg path')).toBeVisible({ timeout: 6000 });
+    const first = await token.boundingBox();
+    if (!first) {
+      throw new Error('Token chip should have a bounding box after first TOKEN_GRANTED event');
+    }
+
+    await expect
+      .poll(
+        async () => {
+          const next = await token.boundingBox();
+          if (!next) return 0;
+          return Math.hypot(next.x - first.x, next.y - first.y);
+        },
+        { timeout: 5000 }
+      )
+      .toBeGreaterThan(20);
+
+    const firstQueueEntry = page.getByRole('list', { name: 'Priority queue' }).locator('li').first();
+    await expect(firstQueueEntry).toContainText('Nia', { timeout: 8000 });
+    await expect(page.getByTestId('queue-entry-agt_part_2')).toContainText('Disagreement', {
+      timeout: 8000,
+    });
+  });
+
+  test('completes the full 2-round simulator flow with convergence and empty queue at end', async ({
+    page,
+  }) => {
+    await page.goto('/sessions/sess_mock_spec204');
+
+    await page.waitForSelector('h1', { timeout: 10000 });
+
+    await expect(page.getByText('Convergence: open')).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Convergence: converging')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('6 entries')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('0 waiting')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('ended')).toHaveCount(2, { timeout: 15000 });
+  });
 });

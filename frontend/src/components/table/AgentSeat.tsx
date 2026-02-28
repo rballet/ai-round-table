@@ -31,8 +31,14 @@ export function AgentSeat({ agent, status, handRaised }: AgentSeatProps) {
   const nameClass = status === 'active' ? 'text-emerald-700' : 'text-slate-900';
 
   return (
-    <div className="flex w-28 flex-col items-center gap-1 text-center">
+    <div
+      className="flex w-28 flex-col items-center gap-1 text-center"
+      data-testid={`agent-seat-${agent.id}`}
+      data-status={status}
+      data-hand-raised={handRaised ? 'true' : 'false'}
+    >
       <div
+        data-testid={`agent-avatar-${agent.id}`}
         className={`relative flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white transition ${glowClass} ${pulseClass}`}
       >
         {initial}

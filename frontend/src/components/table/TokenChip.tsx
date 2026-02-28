@@ -8,6 +8,7 @@ interface TokenChipProps {
 export function TokenChip({ x, y }: TokenChipProps) {
   return (
     <motion.div
+      data-testid="token-chip"
       className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2"
       initial={false}
       animate={{ left: `${x}%`, top: `${y}%` }}

@@ -45,6 +45,7 @@ export function QueuePanel({ queue }: QueuePanelProps) {
               return (
                 <motion.li
                   key={entry.agent_id}
+                  data-testid={`queue-entry-${entry.agent_id}`}
                   layout
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
