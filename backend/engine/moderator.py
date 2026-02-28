@@ -7,7 +7,6 @@ from typing import Mapping
 NOVELTY_SCORES: dict[str, float] = {
     "first_argument": 1.0,
     "correction": 0.9,
-    "factual_correction": 0.9,
     "new_information": 0.7,
     "disagreement": 0.5,
     "synthesis": 0.4,
