@@ -19,6 +19,7 @@ const roleOptions: { value: AgentRole; label: string }[] = [
 const providerOptions = [
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'openai', label: 'OpenAI' },
+  { value: 'mock', label: 'Mock (no API key required)' },
 ];
 
 const defaultDraft: AgentDraft = {
@@ -52,7 +53,16 @@ export function AgentForm({ initialValues, onAdd, onCancel }: AgentFormProps) {
   };
 
   const set = <K extends keyof AgentDraft>(key: K, value: AgentDraft[K]) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [key]: value };
+      // Auto-fill a sensible default model when switching providers
+      if (key === 'llm_provider') {
+        if (value === 'mock') next.llm_model = 'mock';
+        else if (value === 'anthropic' && prev.llm_provider === 'mock') next.llm_model = 'claude-opus-4-5';
+        else if (value === 'openai' && prev.llm_provider === 'mock') next.llm_model = 'gpt-4o';
+      }
+      return next;
+    });
     setErrors((prev) => ({ ...prev, [key]: undefined }));
   };
 

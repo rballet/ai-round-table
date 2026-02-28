@@ -1,12 +1,20 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { api } from '../../../../lib/api';
 import { RoundTable } from '@/components/table/RoundTable';
 import { ArgumentFeed } from '@/components/feed/ArgumentFeed';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useSessionStore } from '@/store/sessionStore';
+import type { SessionStoreState } from '@/store/sessionStore';
+
+const selectSession = (s: SessionStoreState) => s.session;
+const selectAgents = (s: SessionStoreState) => s.agents;
+const selectArguments = (s: SessionStoreState) => s.arguments;
+const selectQueue = (s: SessionStoreState) => s.queue;
+const selectAgentStatuses = (s: SessionStoreState) => s.agentStatuses;
+const selectInitializeSession = (s: SessionStoreState) => s.initializeSession;
 
 export default function LiveSessionPage() {
   const params = useParams<{ id: string | string[] }>();
@@ -16,13 +24,16 @@ export default function LiveSessionPage() {
   }, [params]);
 
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [startPrompt, setStartPrompt] = useState('');
+  const [isStarting, setIsStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
 
-  const session = useSessionStore((state) => state.session);
-  const agents = useSessionStore((state) => state.agents);
-  const argumentsList = useSessionStore((state) => state.arguments);
-  const queue = useSessionStore((state) => state.queue);
-  const agentStatuses = useSessionStore((state) => state.agentStatuses);
-  const initializeSession = useSessionStore((state) => state.initializeSession);
+  const session = useSessionStore(selectSession);
+  const agents = useSessionStore(selectAgents);
+  const argumentsList = useSessionStore(selectArguments);
+  const queue = useSessionStore(selectQueue);
+  const agentStatuses = useSessionStore(selectAgentStatuses);
+  const initializeSession = useSessionStore(selectInitializeSession);
 
   const { isConnected, connectionError } = useWebSocket(sessionId);
 
@@ -40,6 +51,7 @@ export default function LiveSessionPage() {
           return;
         }
         initializeSession(response);
+        setStartPrompt(response.topic);
       })
       .catch((error) => {
         if (!mounted) {
@@ -52,6 +64,19 @@ export default function LiveSessionPage() {
       mounted = false;
     };
   }, [sessionId, initializeSession]);
+
+  const handleStartSession = useCallback(async () => {
+    if (!sessionId) return;
+    setIsStarting(true);
+    setStartError(null);
+    try {
+      await api.startSession(sessionId, { prompt: startPrompt || session?.topic || '' });
+    } catch (err) {
+      setStartError(err instanceof Error ? err.message : 'Failed to start session');
+    } finally {
+      setIsStarting(false);
+    }
+  }, [sessionId, startPrompt, session?.topic]);
 
   if (!sessionId) {
     return (
@@ -81,6 +106,8 @@ export default function LiveSessionPage() {
     );
   }
 
+  const isConfigured = session?.status === 'configured';
+
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-8 text-slate-900">
       <div className="mx-auto max-w-6xl space-y-6">
@@ -97,9 +124,56 @@ export default function LiveSessionPage() {
             >
               {isConnected ? 'WS Connected' : 'WS Disconnected'}
             </span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                session?.status === 'running'
+                  ? 'bg-blue-100 text-blue-700'
+                  : session?.status === 'ended'
+                  ? 'bg-slate-100 text-slate-600'
+                  : 'bg-amber-50 text-amber-700'
+              }`}
+            >
+              {session?.status}
+            </span>
           </div>
           {connectionError && <p className="text-xs text-rose-600">{connectionError}</p>}
         </header>
+
+        {/* Start Session panel — only shown when session is in configured state */}
+        {isConfigured && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 space-y-4">
+            <div>
+              <h2 className="text-sm font-semibold text-amber-900">Ready to start</h2>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Set the opening prompt that will be posed to all agents, then start the discussion.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="start-prompt" className="block text-xs font-medium text-amber-900">
+                Opening Prompt
+              </label>
+              <textarea
+                id="start-prompt"
+                rows={3}
+                value={startPrompt}
+                onChange={(e) => setStartPrompt(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-amber-300 bg-white text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-y"
+                placeholder="What question or framing should the agents debate?"
+              />
+            </div>
+            {startError && (
+              <p className="text-xs text-rose-700">{startError}</p>
+            )}
+            <button
+              type="button"
+              onClick={handleStartSession}
+              disabled={isStarting || !startPrompt.trim()}
+              className="px-5 py-2 rounded-lg bg-amber-900 text-white text-sm font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+            >
+              {isStarting ? 'Starting…' : 'Start Discussion'}
+            </button>
+          </div>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
           <section className="space-y-4">

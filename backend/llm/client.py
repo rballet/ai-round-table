@@ -4,7 +4,7 @@ import asyncio
 from typing import Mapping
 
 from llm.errors import LLMProviderNotFoundError, LLMRateLimitError, LLMTimeoutError
-from llm.providers import AnthropicProvider, BaseLLMProvider, OpenAIProvider
+from llm.providers import AnthropicProvider, BaseLLMProvider, MockProvider, OpenAIProvider
 from llm.types import LLMConfig, Message
 
 
@@ -19,6 +19,7 @@ class LLMClient:
             providers = {
                 "openai": OpenAIProvider(),
                 "anthropic": AnthropicProvider(),
+                "mock": MockProvider(),
             }
 
         self._providers: dict[str, BaseLLMProvider] = {

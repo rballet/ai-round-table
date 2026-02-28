@@ -273,7 +273,12 @@ class SessionOrchestrator:
             "agents": [
                 {
                     "id": agent.id,
+                    "session_id": self._session_id,
                     "display_name": agent.display_name,
+                    "persona_description": agent.persona_description,
+                    "expertise": agent.expertise,
+                    "llm_provider": agent.llm_provider,
+                    "llm_model": agent.llm_model,
                     "role": agent.role,
                 }
                 for agent in agents

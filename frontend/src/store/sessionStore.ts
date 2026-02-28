@@ -76,7 +76,7 @@ function markActiveStatus(
 // Combined store state
 // ---------------------------------------------------------------------------
 
-interface SessionStoreState {
+export interface SessionStoreState {
   // --- Sessions list (SPEC-101-FE) ---
   sessions: Session[];
   sessionsLoading: boolean;

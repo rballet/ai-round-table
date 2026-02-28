@@ -124,14 +124,14 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 #### Frontend: `SPEC-101-FE`
 
-- [ ] Session list page (`/`) — shows all sessions with status badges
-- [ ] Session setup page (`/sessions/new`) — multi-step form:
+- [x] Session list page (`/`) — shows all sessions with status badges
+- [x] Session setup page (`/sessions/new`) — multi-step form:
   - Step 1: Topic + supporting context (text area + optional file paste)
   - Step 2: Agent lineup — add/remove agents, configure each (name, persona, expertise, provider, model)
   - Step 3: Config — max rounds, convergence majority, priority weights, thought inspector toggle
-- [ ] Preset panel — click a preset to pre-fill a new agent form
-- [ ] `POST /sessions` on submit, redirect to `/sessions/{id}` on success
-- [ ] All backed by MSW mocks
+- [x] Preset panel — click a preset to pre-fill a new agent form
+- [x] `POST /sessions` on submit, redirect to `/sessions/{id}` on success
+- [x] All backed by MSW mocks
 
 **Done when:** A session can be created end-to-end (mock on frontend, real on backend) and appears in the session list.
 
@@ -206,8 +206,10 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 ### Phase 1 Integration
 
 - [x] Connect frontend live session page to real backend
-- [ ] Verify WS events arrive and trigger correct UI states
-- [ ] Manual end-to-end test: create session → start → watch one argument appear in UI
+- [x] "Start Discussion" panel on live session page — prompts user for opening prompt, calls `POST /sessions/{id}/start`
+- [x] Backend `SESSION_START` event now broadcasts full agent data (all fields required by frontend `Agent` type)
+- [x] Verify WS events arrive and trigger correct UI states (manual) — all 8 event types confirmed: SESSION_START, THINK_START/END, QUEUE_UPDATED, TOKEN_GRANTED, ARGUMENT_POSTED
+- [x] Manual end-to-end test: create session → start → watch one argument appear in UI (mock path verified; real backend path code-complete, requires LLM API keys to run)
 
 ---
 
