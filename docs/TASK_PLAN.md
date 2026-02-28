@@ -156,11 +156,11 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 **Track:** Backend only
 
-- [ ] Implement `think.py` prompt builder — takes `ContextBundle`, returns `list[Message]`
-- [ ] Implement `AgentRunner.think(agent, context_bundle)` — calls LLM, saves `Thought` to SQLite
-- [ ] Implement parallel execution in `SessionOrchestrator._phase_think()` using `asyncio.gather()`
-- [ ] Broadcast `THINK_START` before each LLM call, `THINK_END` after
-- [ ] `POST /sessions/{id}/start` triggers the orchestrator
+- [x] Implement `think.py` prompt builder — takes `ContextBundle`, returns `list[Message]`
+- [x] Implement `AgentRunner.think(agent, context_bundle)` — calls LLM, saves `Thought` to SQLite
+- [x] Implement parallel execution in `SessionOrchestrator._phase_think()` using `asyncio.gather()`
+- [x] Broadcast `THINK_START` before each LLM call, `THINK_END` after
+- [x] `POST /sessions/{id}/start` triggers the orchestrator
 
 **Done when:** Calling `start` on a session causes all participant agents to think in parallel, thoughts are saved to SQLite, and WS events are emitted.
 

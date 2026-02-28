@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+import asyncio
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.database import get_db
+from core.database import AsyncSessionLocal, get_db
+from engine.orchestrator import SessionOrchestrator
 from schemas.api import (
     CreateSessionRequestSchema,
+    StartSessionRequestSchema,
     SessionResponseSchema,
     SessionsListResponseSchema,
 )
@@ -105,3 +109,40 @@ async def get_session(
         for agent in session.agents
     ]
     return SessionResponseSchema(**base.model_dump(), agents=agents_out)
+
+
+@router.post("/{session_id}/start", status_code=202)
+async def start_session(
+    session_id: str,
+    payload: StartSessionRequestSchema,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    session = await session_service.get_session(db, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    active_tasks: dict[str, asyncio.Task] = request.app.state.orchestrator_tasks
+    existing_task = active_tasks.get(session_id)
+    if existing_task is not None and not existing_task.done():
+        raise HTTPException(
+            status_code=409, detail="Session is already running"
+        )
+
+    session_factory = getattr(
+        request.app.state, "session_factory", AsyncSessionLocal
+    )
+    orchestrator = SessionOrchestrator(
+        session_id=session_id,
+        session_factory=session_factory,
+        broadcast_manager=request.app.state.broadcast_manager,
+        llm_client=request.app.state.llm_client,
+    )
+    task = asyncio.create_task(orchestrator.run(prompt=payload.prompt))
+    active_tasks[session_id] = task
+
+    def _cleanup(_task: asyncio.Task, sid: str = session_id) -> None:
+        active_tasks.pop(sid, None)
+
+    task.add_done_callback(_cleanup)
+    return {"session_id": session_id, "status": "running"}
