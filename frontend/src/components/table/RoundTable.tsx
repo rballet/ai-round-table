@@ -1,10 +1,13 @@
 import { Agent } from 'shared/types/agent';
 import { AgentRuntimeStatus } from '@/store/sessionStore';
 import { AgentSeat } from './AgentSeat';
+import { TokenChip } from './TokenChip';
 
 interface RoundTableProps {
   agents: Agent[];
   agentStatuses: Record<string, AgentRuntimeStatus>;
+  raisedHands: Record<string, boolean>;
+  activeAgentId: string | null;
 }
 
 function seatPosition(index: number, total: number) {
@@ -14,7 +17,7 @@ function seatPosition(index: number, total: number) {
   return { x, y };
 }
 
-export function RoundTable({ agents, agentStatuses }: RoundTableProps) {
+export function RoundTable({ agents, agentStatuses, raisedHands, activeAgentId }: RoundTableProps) {
   if (agents.length === 0) {
     return (
       <div className="flex h-[480px] items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white">
@@ -22,6 +25,9 @@ export function RoundTable({ agents, agentStatuses }: RoundTableProps) {
       </div>
     );
   }
+
+  const activeIndex = activeAgentId ? agents.findIndex((agent) => agent.id === activeAgentId) : -1;
+  const activePosition = activeIndex >= 0 ? seatPosition(activeIndex, agents.length) : null;
 
   return (
     <div className="relative h-[480px] rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -32,6 +38,8 @@ export function RoundTable({ agents, agentStatuses }: RoundTableProps) {
         </text>
       </svg>
 
+      {activePosition && <TokenChip x={activePosition.x} y={activePosition.y} />}
+
       {agents.map((agent, index) => {
         const { x, y } = seatPosition(index, agents.length);
         return (
@@ -40,7 +48,11 @@ export function RoundTable({ agents, agentStatuses }: RoundTableProps) {
             className="absolute -translate-x-1/2 -translate-y-1/2"
             style={{ left: `${x}%`, top: `${y}%` }}
           >
-            <AgentSeat agent={agent} status={agentStatuses[agent.id] ?? 'idle'} />
+            <AgentSeat
+              agent={agent}
+              status={agentStatuses[agent.id] ?? 'idle'}
+              handRaised={raisedHands[agent.id] ?? false}
+            />
           </div>
         );
       })}

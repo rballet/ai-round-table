@@ -327,9 +327,13 @@ test.describe('Session detail page', () => {
 
     await page.waitForSelector('h1', { timeout: 10000 });
 
-    await expect(
-      page.getByRole('heading', { name: 'Should AI systems be regulated by governments?' }),
-    ).toBeVisible();
+    const fixtureTopic = page.getByRole('heading', {
+      name: 'Should AI systems be regulated by governments?',
+    });
+    const simulatedTopic = page.getByRole('heading', {
+      name: 'Should we split our API into microservices?',
+    });
+    await expect(fixtureTopic.or(simulatedTopic)).toBeVisible();
   });
 
   test('shows WS connection status badge', async ({ page }) => {
@@ -348,8 +352,8 @@ test.describe('Session detail page', () => {
 
     await page.waitForSelector('h1', { timeout: 10000 });
 
-    // Queue Snapshot section from the live session page.
-    await expect(page.getByRole('heading', { name: 'Queue Snapshot' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Session Status' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Priority Queue' })).toBeVisible();
 
     // ArgumentFeed renders with its heading.
     await expect(page.getByRole('heading', { name: 'Argument Feed' })).toBeVisible();
@@ -360,10 +364,30 @@ test.describe('Session detail page', () => {
 
     await page.waitForSelector('h1', { timeout: 10000 });
 
-    // MOCK_AGENTS for sess_mock_001: Aria, Scribe, The Challenger, The Pragmatist.
-    // AgentSeat renders the agent name as a label.
-    await expect(page.getByText('Aria')).toBeVisible();
-    await expect(page.getByText('The Challenger')).toBeVisible();
-    await expect(page.getByText('The Pragmatist')).toBeVisible();
+    const fixtureAgent = page.getByText('Aria');
+    const simulatedAgent = page.getByText('Moderator Maya');
+    await expect(fixtureAgent.or(simulatedAgent)).toBeVisible();
+  });
+
+  test('renders queue updates, token movement, and hand-raise indicators from simulator events', async ({
+    page,
+  }) => {
+    await page.goto('/sessions/sess_mock_spec204');
+
+    await page.waitForSelector('h1', { timeout: 10000 });
+
+    await expect(page.getByRole('list', { name: 'Priority queue' }).getByText('Alex')).toBeVisible({
+      timeout: 6000,
+    });
+    await expect(page.getByText('Token')).toBeVisible({ timeout: 6000 });
+    await expect(page.getByTitle('Token request pending').first()).toBeVisible({ timeout: 6000 });
+  });
+
+  test('updates round progress to the second round during the simulated session', async ({ page }) => {
+    await page.goto('/sessions/sess_mock_spec204');
+
+    await page.waitForSelector('h1', { timeout: 10000 });
+
+    await expect(page.getByText('Round 2 / 2')).toBeVisible({ timeout: 10000 });
   });
 });

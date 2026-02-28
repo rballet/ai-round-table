@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { api } from '../../../../lib/api';
 import { RoundTable } from '@/components/table/RoundTable';
+import { QueuePanel } from '@/components/table/QueuePanel';
 import { ArgumentFeed } from '@/components/feed/ArgumentFeed';
+import { SessionStatus } from '@/components/controls/SessionStatus';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useSessionStore } from '@/store/sessionStore';
 import type { SessionStoreState } from '@/store/sessionStore';
@@ -14,6 +16,11 @@ const selectAgents = (s: SessionStoreState) => s.agents;
 const selectArguments = (s: SessionStoreState) => s.arguments;
 const selectQueue = (s: SessionStoreState) => s.queue;
 const selectAgentStatuses = (s: SessionStoreState) => s.agentStatuses;
+const selectRaisedHands = (s: SessionStoreState) => s.raisedHands;
+const selectActiveAgentId = (s: SessionStoreState) => s.activeAgentId;
+const selectCurrentRound = (s: SessionStoreState) => s.currentRound;
+const selectCurrentTurn = (s: SessionStoreState) => s.currentTurn;
+const selectConvergenceStatus = (s: SessionStoreState) => s.convergenceStatus;
 const selectInitializeSession = (s: SessionStoreState) => s.initializeSession;
 
 export default function LiveSessionPage() {
@@ -33,6 +40,11 @@ export default function LiveSessionPage() {
   const argumentsList = useSessionStore(selectArguments);
   const queue = useSessionStore(selectQueue);
   const agentStatuses = useSessionStore(selectAgentStatuses);
+  const raisedHands = useSessionStore(selectRaisedHands);
+  const activeAgentId = useSessionStore(selectActiveAgentId);
+  const currentRound = useSessionStore(selectCurrentRound);
+  const currentTurn = useSessionStore(selectCurrentTurn);
+  const convergenceStatus = useSessionStore(selectConvergenceStatus);
   const initializeSession = useSessionStore(selectInitializeSession);
 
   const { isConnected, connectionError } = useWebSocket(sessionId);
@@ -175,23 +187,25 @@ export default function LiveSessionPage() {
           </div>
         )}
 
+        {session && (
+          <SessionStatus
+            status={session.status}
+            currentRound={currentRound}
+            currentTurn={currentTurn}
+            maxRounds={session.config.max_rounds}
+            convergenceStatus={convergenceStatus}
+          />
+        )}
+
         <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
           <section className="space-y-4">
-            <RoundTable agents={agents} agentStatuses={agentStatuses} />
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <h2 className="mb-2 text-sm font-semibold text-slate-900">Queue Snapshot</h2>
-              {queue.length > 0 ? (
-                <ul className="space-y-1 text-sm text-slate-700">
-                  {queue.map((entry) => (
-                    <li key={`${entry.agent_id}-${entry.position}`}>
-                      {entry.position}. {entry.agent_name ?? entry.agent_id} ({entry.priority_score.toFixed(2)})
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-slate-500">Queue is empty.</p>
-              )}
-            </div>
+            <RoundTable
+              agents={agents}
+              agentStatuses={agentStatuses}
+              raisedHands={raisedHands}
+              activeAgentId={activeAgentId}
+            />
+            <QueuePanel queue={queue} />
           </section>
 
           <ArgumentFeed argumentsList={argumentsList} />

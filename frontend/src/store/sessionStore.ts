@@ -8,7 +8,7 @@ import { RoundTableEvent } from 'shared/types/events';
 // Wizard types (SPEC-101-FE: session creation)
 // ---------------------------------------------------------------------------
 
-export interface AgentDraft extends Omit<Agent, 'id' | 'session_id'> {}
+export type AgentDraft = Omit<Agent, 'id' | 'session_id'>;
 
 export interface WizardState {
   step: 1 | 2 | 3;
@@ -42,6 +42,7 @@ const defaultWizard: WizardState = {
 // ---------------------------------------------------------------------------
 
 export type AgentRuntimeStatus = 'idle' | 'thinking' | 'active' | 'updating';
+export type ConvergenceRuntimeStatus = 'open' | 'converging' | 'capped' | null;
 
 export interface LiveArgument {
   id: string;
@@ -60,6 +61,10 @@ function toIdleStatuses(agents: Agent[]): Record<string, AgentRuntimeStatus> {
   return Object.fromEntries(agents.map((agent) => [agent.id, 'idle']));
 }
 
+function toLoweredHands(agents: Agent[]): Record<string, boolean> {
+  return Object.fromEntries(agents.map((agent) => [agent.id, false]));
+}
+
 function markActiveStatus(
   previous: Record<string, AgentRuntimeStatus>,
   agents: Agent[],
@@ -68,6 +73,20 @@ function markActiveStatus(
   const next = { ...previous };
   for (const agent of agents) {
     next[agent.id] = agent.id === activeAgentId ? 'active' : 'idle';
+  }
+  return next;
+}
+
+function keepHandsForQueuedAgents(
+  previous: Record<string, boolean>,
+  queue: QueueEntry[]
+): Record<string, boolean> {
+  const queuedAgentIds = new Set(queue.map((entry) => entry.agent_id));
+  const next = { ...previous };
+  for (const agentId of Object.keys(next)) {
+    if (!queuedAgentIds.has(agentId)) {
+      next[agentId] = false;
+    }
   }
   return next;
 }
@@ -88,7 +107,11 @@ export interface SessionStoreState {
   arguments: LiveArgument[];
   queue: QueueEntry[];
   agentStatuses: Record<string, AgentRuntimeStatus>;
+  raisedHands: Record<string, boolean>;
   activeAgentId: string | null;
+  currentRound: number;
+  currentTurn: number;
+  convergenceStatus: ConvergenceRuntimeStatus;
   isConnected: boolean;
   connectionError: string | null;
 
@@ -127,7 +150,11 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
   arguments: [],
   queue: [],
   agentStatuses: {},
+  raisedHands: {},
   activeAgentId: null,
+  currentRound: 0,
+  currentTurn: 0,
+  convergenceStatus: null,
   isConnected: false,
   connectionError: null,
 
@@ -150,7 +177,11 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
       arguments: [],
       queue: [],
       activeAgentId: null,
+      currentRound: session.rounds_elapsed ?? 0,
+      currentTurn: 0,
+      convergenceStatus: null,
       agentStatuses: toIdleStatuses(session.agents),
+      raisedHands: toLoweredHands(session.agents),
       connectionError: null,
     }),
 
@@ -165,12 +196,23 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
             state.agents.length === event.agents.length
               ? state.agentStatuses
               : toIdleStatuses(event.agents);
+          const raisedHands =
+            state.agents.length === event.agents.length
+              ? state.raisedHands
+              : toLoweredHands(event.agents);
           return {
             session: state.session
-              ? { ...state.session, status: 'running', topic: event.topic, agents: event.agents }
+              ? {
+                  ...state.session,
+                  status: 'running',
+                  topic: event.topic,
+                  agents: event.agents,
+                  config: event.config ?? state.session.config,
+                }
               : null,
             agents: event.agents,
             agentStatuses,
+            raisedHands,
           };
         }
         case 'THINK_START':
@@ -191,15 +233,37 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
         case 'TOKEN_GRANTED':
           return {
             activeAgentId: event.agent_id,
+            currentRound: event.round_index,
+            currentTurn: event.turn_index,
             agentStatuses: markActiveStatus(state.agentStatuses, state.agents, event.agent_id),
+            raisedHands: {
+              ...state.raisedHands,
+              [event.agent_id]: false,
+            },
+            session: state.session
+              ? {
+                  ...state.session,
+                  rounds_elapsed: Math.max(state.session.rounds_elapsed ?? 0, event.round_index),
+                }
+              : null,
           };
         case 'ARGUMENT_POSTED':
           return {
             arguments: [...state.arguments, event.argument],
             activeAgentId: event.argument.agent_id,
           };
+        case 'TOKEN_REQUEST':
+          return {
+            raisedHands: {
+              ...state.raisedHands,
+              [event.agent_id]: true,
+            },
+          };
         case 'QUEUE_UPDATED':
-          return { queue: event.queue };
+          return {
+            queue: event.queue,
+            raisedHands: keepHandsForQueuedAgents(state.raisedHands, event.queue),
+          };
         case 'UPDATE_START':
           return {
             agentStatuses: {
@@ -215,11 +279,35 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
                 state.agentStatuses[event.agent_id] === 'active' ? 'active' : 'idle',
             },
           };
+        case 'CONVERGENCE_CHECK':
+          return {
+            convergenceStatus: event.status,
+            session: state.session
+              ? { ...state.session, rounds_elapsed: event.rounds_elapsed }
+              : null,
+          };
+        case 'SESSION_PAUSED':
+          return {
+            session: state.session ? { ...state.session, status: 'paused' } : null,
+          };
+        case 'SESSION_RESUMED':
+          return {
+            session: state.session ? { ...state.session, status: 'running' } : null,
+          };
         case 'SESSION_END':
           return {
             activeAgentId: null,
-            session: state.session ? { ...state.session, status: 'ended' } : null,
+            currentRound: Math.max(state.currentRound, event.rounds_elapsed),
+            session: state.session
+              ? {
+                  ...state.session,
+                  status: 'ended',
+                  termination_reason: event.reason,
+                  rounds_elapsed: event.rounds_elapsed,
+                }
+              : null,
             agentStatuses: toIdleStatuses(state.agents),
+            raisedHands: toLoweredHands(state.agents),
           };
         default:
           return state;
