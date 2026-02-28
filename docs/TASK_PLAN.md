@@ -289,14 +289,14 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 **Track:** Frontend (parallel with SPEC-202/203)
 
-- [ ] `ArgumentBubble` — expand/collapse
-- [ ] `ArgumentBubble` — agent role badge
+- [x] `ArgumentBubble` — expand/collapse
+- [x] `ArgumentBubble` — agent role badge
 - [x] `ArgumentBubble` — round/turn label (already rendered in feed cards)
-- [ ] Auto-scroll to latest argument, pause auto-scroll when user scrolls up
+- [x] Auto-scroll to latest argument, pause auto-scroll when user scrolls up
 - [x] WS Simulator emits `SESSION_END` + `SUMMARY_POSTED` in the 2-round flow (from SPEC-204)
-- [ ] `SESSION_END` / `SUMMARY_POSTED` events trigger summary overlay/panel
-- [ ] Summary rendered as formatted Markdown
-- [ ] Termination reason badge (consensus / cap / host)
+- [x] `SESSION_END` / `SUMMARY_POSTED` events trigger summary overlay/panel
+- [x] Summary rendered as formatted Markdown
+- [x] Termination reason badge (consensus / cap / host)
 
 **Done when:** The argument feed works smoothly through a full simulated session and the summary panel displays correctly.
 
@@ -306,10 +306,11 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 **Track:** Backend
 
-- [ ] `GET /sessions/{id}/transcript` — full ordered arguments
-- [ ] `GET /sessions/{id}/thoughts` — latest thoughts per agent (+ version history query params)
-- [ ] `GET /sessions/{id}/queue` — current queue snapshot
-- [ ] `GET /sessions/{id}/summary` — scribe summary
+- [x] `GET /sessions/{id}/transcript` — full ordered arguments
+- [x] `GET /sessions/{id}/thoughts` — latest thoughts per agent (+ version history query params)
+- [x] `GET /sessions/{id}/queue` — current queue snapshot
+- [x] `GET /sessions/{id}/summary` — scribe summary
+- [x] Frontend follow-up after SPEC-205: hydrate Summary panel on page load for ended sessions via `GET /sessions/{id}/summary` (covers hard refresh without WS replay)
 
 **Done when:** All four endpoints return correct data for a completed session.
 

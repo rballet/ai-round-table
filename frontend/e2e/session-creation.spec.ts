@@ -441,6 +441,66 @@ test.describe('Session detail page', () => {
     });
   });
 
+  test('renders argument role badges and supports expand/collapse for long arguments', async ({
+    page,
+  }) => {
+    await page.goto('/sessions/sess_mock_spec204');
+
+    await page.waitForSelector('h1', { timeout: 10000 });
+
+    const longArgumentBubble = page.getByTestId('argument-bubble-arg_mock_4');
+    await expect(longArgumentBubble).toBeVisible({ timeout: 11000 });
+    await expect(longArgumentBubble).toContainText('participant');
+    await expect(longArgumentBubble).not.toContainText('cross predefined thresholds');
+
+    await longArgumentBubble.getByRole('button', { name: 'Read more' }).click();
+    await expect(longArgumentBubble).toContainText('cross predefined thresholds');
+    await expect(longArgumentBubble.getByRole('button', { name: 'Show less' })).toBeVisible();
+  });
+
+  test('pauses auto-scroll when scrolling up and resumes with "Jump to latest"', async ({ page }) => {
+    await page.goto('/sessions/sess_mock_spec204');
+
+    await page.waitForSelector('h1', { timeout: 10000 });
+
+    const feedContainer = page.getByTestId('argument-feed-scroll-container');
+    await expect
+      .poll(
+        async () => feedContainer.evaluate((node) => node.scrollHeight > node.clientHeight),
+        { timeout: 12000 }
+      )
+      .toBe(true);
+
+    await feedContainer.evaluate((node) => {
+      node.scrollTop = 0;
+      node.dispatchEvent(new Event('scroll', { bubbles: true }));
+    });
+
+    const jumpButton = page.getByRole('button', { name: 'Jump to latest' });
+    await expect(jumpButton).toBeVisible();
+    await jumpButton.click();
+    await expect(jumpButton).not.toBeVisible();
+  });
+
+  test('opens summary overlay on SESSION_END/SUMMARY_POSTED with termination reason and markdown content', async ({
+    page,
+  }) => {
+    await page.goto('/sessions/sess_mock_spec204');
+
+    await page.waitForSelector('h1', { timeout: 10000 });
+
+    const summaryPanel = page.getByTestId('summary-panel');
+    await expect(summaryPanel).toBeVisible({ timeout: 16000 });
+    await expect(page.getByTestId('termination-reason-badge')).toContainText('Consensus');
+    await expect(summaryPanel).toContainText('keep a modular monolith now');
+
+    await page.getByLabel('Close summary panel').click();
+    await expect(summaryPanel).not.toBeVisible();
+
+    await page.getByRole('button', { name: 'View Summary' }).click();
+    await expect(summaryPanel).toBeVisible();
+  });
+
   test('completes the full 2-round simulator flow with convergence and empty queue at end', async ({
     page,
   }) => {
@@ -452,6 +512,7 @@ test.describe('Session detail page', () => {
     await expect(page.getByText('Convergence: converging')).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('6 entries')).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('0 waiting')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('ended')).toHaveCount(2, { timeout: 15000 });
+    await expect(page.getByText('ended').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('summary-panel')).toBeVisible({ timeout: 15000 });
   });
 });

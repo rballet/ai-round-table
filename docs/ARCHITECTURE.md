@@ -212,7 +212,8 @@ frontend/
 │   │   └── QueuePanel.tsx      # Priority queue sidebar
 │   ├── feed/
 │   │   ├── ArgumentFeed.tsx    # Scrollable argument list
-│   │   ├── ArgumentBubble.tsx  # Single argument card
+│   │   ├── ArgumentBubble.tsx  # Single argument card (role badge + expand/collapse)
+│   │   ├── SummaryPanel.tsx    # SESSION_END/SUMMARY_POSTED overlay with Markdown summary
 │   │   └── ThoughtInspector.tsx # Expandable private thought panel
 │   ├── setup/
 │   │   ├── SessionSetupForm.tsx

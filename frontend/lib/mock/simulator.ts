@@ -415,7 +415,7 @@ export class WSSimulator {
             round_index: 2,
             turn_index: 4,
             content:
-              'Round two proposal: keep one deployable unit, but enforce internal module contracts and team ownership to reduce coupling.',
+              'Round two proposal: keep one deployable unit, enforce strict internal module contracts, and assign explicit team ownership per boundary. That keeps coordination overhead low for a small team while making extraction paths measurable when change velocity, incident load, and handoff friction cross predefined thresholds.',
           },
         },
       },

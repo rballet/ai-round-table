@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { Session, SessionConfig } from 'shared/types/session';
-import { Agent, QueueEntry } from 'shared/types/agent';
+import { Session, SessionConfig, TerminationReason } from 'shared/types/session';
+import { Agent, AgentRole, QueueEntry } from 'shared/types/agent';
 import { SessionResponse } from 'shared/types/api';
 import { RoundTableEvent } from 'shared/types/events';
 
@@ -48,9 +48,16 @@ export interface LiveArgument {
   id: string;
   agent_id: string;
   agent_name: string;
+  agent_role: AgentRole;
   round_index: number;
   turn_index: number;
   content: string;
+}
+
+export interface LiveSummary {
+  id: string;
+  content: string;
+  termination_reason: Exclude<TerminationReason, null>;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,6 +116,8 @@ export interface SessionStoreState {
   agentStatuses: Record<string, AgentRuntimeStatus>;
   raisedHands: Record<string, boolean>;
   activeAgentId: string | null;
+  summary: LiveSummary | null;
+  summaryPanelOpen: boolean;
   currentRound: number;
   currentTurn: number;
   convergenceStatus: ConvergenceRuntimeStatus;
@@ -127,6 +136,9 @@ export interface SessionStoreState {
   initializeSession: (session: SessionResponse) => void;
   handleEvent: (event: RoundTableEvent) => void;
   setConnectionState: (isConnected: boolean, error?: string | null) => void;
+  openSummaryPanel: () => void;
+  closeSummaryPanel: () => void;
+  setSummary: (summary: LiveSummary) => void;
 
   // --- Actions: wizard ---
   setWizardStep: (step: 1 | 2 | 3) => void;
@@ -152,6 +164,8 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
   agentStatuses: {},
   raisedHands: {},
   activeAgentId: null,
+  summary: null,
+  summaryPanelOpen: false,
   currentRound: 0,
   currentTurn: 0,
   convergenceStatus: null,
@@ -177,6 +191,8 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
       arguments: [],
       queue: [],
       activeAgentId: null,
+      summary: null,
+      summaryPanelOpen: false,
       currentRound: session.rounds_elapsed ?? 0,
       currentTurn: 0,
       convergenceStatus: null,
@@ -187,6 +203,10 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
 
   setConnectionState: (isConnected, error = null) =>
     set({ isConnected, connectionError: error }),
+
+  openSummaryPanel: () => set({ summaryPanelOpen: true }),
+  closeSummaryPanel: () => set({ summaryPanelOpen: false }),
+  setSummary: (summary) => set({ summary }),
 
   handleEvent: (event) =>
     set((state) => {
@@ -203,12 +223,12 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
           return {
             session: state.session
               ? {
-                  ...state.session,
-                  status: 'running',
-                  topic: event.topic,
-                  agents: event.agents,
-                  config: event.config ?? state.session.config,
-                }
+                ...state.session,
+                status: 'running',
+                topic: event.topic,
+                agents: event.agents,
+                config: event.config ?? state.session.config,
+              }
               : null,
             agents: event.agents,
             agentStatuses,
@@ -242,16 +262,20 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
             },
             session: state.session
               ? {
-                  ...state.session,
-                  rounds_elapsed: Math.max(state.session.rounds_elapsed ?? 0, event.round_index),
-                }
+                ...state.session,
+                rounds_elapsed: Math.max(state.session.rounds_elapsed ?? 0, event.round_index),
+              }
               : null,
           };
-        case 'ARGUMENT_POSTED':
+        case 'ARGUMENT_POSTED': {
+          const agentRole =
+            state.agents.find((agent) => agent.id === event.argument.agent_id)?.role ??
+            'participant';
           return {
-            arguments: [...state.arguments, event.argument],
+            arguments: [...state.arguments, { ...event.argument, agent_role: agentRole }],
             activeAgentId: event.argument.agent_id,
           };
+        }
         case 'TOKEN_REQUEST':
           return {
             raisedHands: {
@@ -297,17 +321,29 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
         case 'SESSION_END':
           return {
             activeAgentId: null,
+            summaryPanelOpen: true,
             currentRound: Math.max(state.currentRound, event.rounds_elapsed),
             session: state.session
               ? {
-                  ...state.session,
-                  status: 'ended',
-                  termination_reason: event.reason,
-                  rounds_elapsed: event.rounds_elapsed,
-                }
+                ...state.session,
+                status: 'ended',
+                termination_reason: event.reason,
+                rounds_elapsed: event.rounds_elapsed,
+              }
               : null,
             agentStatuses: toIdleStatuses(state.agents),
             raisedHands: toLoweredHands(state.agents),
+          };
+        case 'SUMMARY_POSTED':
+          return {
+            summary: event.summary,
+            summaryPanelOpen: true,
+            session: state.session
+              ? {
+                ...state.session,
+                termination_reason: event.summary.termination_reason,
+              }
+              : null,
           };
         default:
           return state;

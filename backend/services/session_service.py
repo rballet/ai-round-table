@@ -10,6 +10,10 @@ from sqlalchemy.orm import selectinload
 
 from models.agent import Agent
 from models.session import Session
+from models.argument import Argument
+from models.thought import Thought
+from models.queue_entry import QueueEntry
+from models.summary import Summary
 from schemas.api import CreateSessionRequestSchema
 
 
@@ -95,3 +99,56 @@ async def list_sessions(db: AsyncSession) -> list[Session]:
         .order_by(Session.created_at.desc())
     )
     return list(result.scalars().all())
+
+
+async def get_transcript(db: AsyncSession, session_id: str) -> list[Argument]:
+    result = await db.execute(
+        select(Argument)
+        .where(Argument.session_id == session_id)
+        .order_by(Argument.created_at.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def get_thoughts(
+    db: AsyncSession, session_id: str, version: int | None = None
+) -> list[Thought]:
+    query = select(Thought).where(Thought.session_id == session_id)
+    if version is not None:
+        query = query.where(Thought.version == version)
+    else:
+        query = query.order_by(Thought.agent_id, Thought.version.desc())
+
+    result = await db.execute(query)
+    thoughts = list(result.scalars().all())
+
+    if version is None:
+        latest_thoughts = []
+        seen_agents = set()
+        for t in thoughts:
+            if t.agent_id not in seen_agents:
+                latest_thoughts.append(t)
+                seen_agents.add(t.agent_id)
+        return latest_thoughts
+    return thoughts
+
+
+async def get_queue(db: AsyncSession, session_id: str) -> list[QueueEntry]:
+    result = await db.execute(
+        select(QueueEntry)
+        .where(QueueEntry.session_id == session_id)
+        .where(QueueEntry.processed_at.is_(None))
+        .order_by(QueueEntry.position.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def get_summary(db: AsyncSession, session_id: str) -> Summary | None:
+    result = await db.execute(
+        select(Summary)
+        .where(Summary.session_id == session_id)
+        .order_by(Summary.created_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+

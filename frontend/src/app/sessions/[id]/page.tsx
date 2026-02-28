@@ -6,6 +6,7 @@ import { api } from '../../../../lib/api';
 import { RoundTable } from '@/components/table/RoundTable';
 import { QueuePanel } from '@/components/table/QueuePanel';
 import { ArgumentFeed } from '@/components/feed/ArgumentFeed';
+import { SummaryPanel } from '@/components/feed/SummaryPanel';
 import { SessionStatus } from '@/components/controls/SessionStatus';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useSessionStore } from '@/store/sessionStore';
@@ -21,7 +22,12 @@ const selectActiveAgentId = (s: SessionStoreState) => s.activeAgentId;
 const selectCurrentRound = (s: SessionStoreState) => s.currentRound;
 const selectCurrentTurn = (s: SessionStoreState) => s.currentTurn;
 const selectConvergenceStatus = (s: SessionStoreState) => s.convergenceStatus;
+const selectSummary = (s: SessionStoreState) => s.summary;
+const selectSummaryPanelOpen = (s: SessionStoreState) => s.summaryPanelOpen;
+const selectOpenSummaryPanel = (s: SessionStoreState) => s.openSummaryPanel;
+const selectCloseSummaryPanel = (s: SessionStoreState) => s.closeSummaryPanel;
 const selectInitializeSession = (s: SessionStoreState) => s.initializeSession;
+const selectSetSummary = (s: SessionStoreState) => s.setSummary;
 
 export default function LiveSessionPage() {
   const params = useParams<{ id: string | string[] }>();
@@ -45,7 +51,12 @@ export default function LiveSessionPage() {
   const currentRound = useSessionStore(selectCurrentRound);
   const currentTurn = useSessionStore(selectCurrentTurn);
   const convergenceStatus = useSessionStore(selectConvergenceStatus);
+  const summary = useSessionStore(selectSummary);
+  const summaryPanelOpen = useSessionStore(selectSummaryPanelOpen);
+  const openSummaryPanel = useSessionStore(selectOpenSummaryPanel);
+  const closeSummaryPanel = useSessionStore(selectCloseSummaryPanel);
   const initializeSession = useSessionStore(selectInitializeSession);
+  const setSummary = useSessionStore(selectSetSummary);
 
   const { isConnected, connectionError } = useWebSocket(sessionId);
 
@@ -64,6 +75,23 @@ export default function LiveSessionPage() {
         }
         initializeSession(response);
         setStartPrompt(response.topic);
+
+        if (response.status === 'ended') {
+          api
+            .getSummary(sessionId)
+            .then((summaryRes) => {
+              if (mounted) {
+                setSummary({
+                  id: summaryRes.id,
+                  content: summaryRes.content,
+                  termination_reason: summaryRes.termination_reason as any,
+                });
+              }
+            })
+            .catch((err) => {
+              console.error('Failed to load summary for ended session:', err);
+            });
+        }
       })
       .catch((error) => {
         if (!mounted) {
@@ -75,7 +103,7 @@ export default function LiveSessionPage() {
     return () => {
       mounted = false;
     };
-  }, [sessionId, initializeSession]);
+  }, [sessionId, initializeSession, setSummary]);
 
   const handleStartSession = useCallback(async () => {
     if (!sessionId) return;
@@ -119,6 +147,7 @@ export default function LiveSessionPage() {
   }
 
   const isConfigured = session?.status === 'configured';
+  const canShowSummaryButton = (session?.status === 'ended' || Boolean(summary)) && !summaryPanelOpen;
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-8 text-slate-900">
@@ -130,23 +159,30 @@ export default function LiveSessionPage() {
               Session {sessionId}
             </span>
             <span
-              className={`rounded-full px-2 py-0.5 text-xs ${
-                isConnected ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'
-              }`}
+              className={`rounded-full px-2 py-0.5 text-xs ${isConnected ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'
+                }`}
             >
               {isConnected ? 'WS Connected' : 'WS Disconnected'}
             </span>
             <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                session?.status === 'running'
+              className={`rounded-full px-2 py-0.5 text-xs font-medium ${session?.status === 'running'
                   ? 'bg-blue-100 text-blue-700'
                   : session?.status === 'ended'
-                  ? 'bg-slate-100 text-slate-600'
-                  : 'bg-amber-50 text-amber-700'
-              }`}
+                    ? 'bg-slate-100 text-slate-600'
+                    : 'bg-amber-50 text-amber-700'
+                }`}
             >
               {session?.status}
             </span>
+            {canShowSummaryButton && (
+              <button
+                type="button"
+                onClick={openSummaryPanel}
+                className="rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-medium text-cyan-800 hover:bg-cyan-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-700"
+              >
+                View Summary
+              </button>
+            )}
           </div>
           {connectionError && <p className="text-xs text-rose-600">{connectionError}</p>}
         </header>
@@ -211,6 +247,13 @@ export default function LiveSessionPage() {
           <ArgumentFeed argumentsList={argumentsList} />
         </div>
       </div>
+
+      <SummaryPanel
+        isOpen={summaryPanelOpen}
+        summary={summary}
+        terminationReason={session?.termination_reason ?? null}
+        onClose={closeSummaryPanel}
+      />
     </main>
   );
 }

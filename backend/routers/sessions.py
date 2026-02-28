@@ -12,6 +12,10 @@ from schemas.api import (
     StartSessionRequestSchema,
     SessionResponseSchema,
     SessionsListResponseSchema,
+    TranscriptResponseSchema,
+    ThoughtsResponseSchema,
+    QueueResponseSchema,
+    SummaryResponseSchema,
 )
 from schemas.session import SessionSchema
 from services import session_service
@@ -151,3 +155,110 @@ async def start_session(
 
     task.add_done_callback(_cleanup)
     return {"session_id": session_id, "status": "running"}
+
+
+@router.get("/{session_id}/transcript", response_model=TranscriptResponseSchema)
+async def get_transcript(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> TranscriptResponseSchema:
+    session = await session_service.get_session(db, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    agents_map = {a.id: a.display_name for a in session.agents}
+    arguments = await session_service.get_transcript(db, session_id)
+
+    args_out = []
+    for arg in arguments:
+        created_at_str = arg.created_at.isoformat() if hasattr(arg.created_at, "isoformat") else str(arg.created_at)
+        args_out.append({
+            "id": arg.id,
+            "agent_id": arg.agent_id,
+            "agent_name": agents_map.get(arg.agent_id, "Unknown"),
+            "round_index": arg.round_index,
+            "turn_index": arg.turn_index,
+            "content": arg.content,
+            "created_at": created_at_str,
+        })
+
+    return TranscriptResponseSchema(session_id=session_id, arguments=args_out)
+
+
+@router.get("/{session_id}/thoughts", response_model=ThoughtsResponseSchema)
+async def get_thoughts(
+    session_id: str,
+    version: int | None = None,
+    db: AsyncSession = Depends(get_db),
+) -> ThoughtsResponseSchema:
+    session = await session_service.get_session(db, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    agents_map = {a.id: a.display_name for a in session.agents}
+    thoughts = await session_service.get_thoughts(db, session_id, version)
+
+    thoughts_out = []
+    for t in thoughts:
+        created_at_str = t.created_at.isoformat() if hasattr(t.created_at, "isoformat") else str(t.created_at)
+        thoughts_out.append({
+            "id": t.id,
+            "agent_id": t.agent_id,
+            "agent_name": agents_map.get(t.agent_id, "Unknown"),
+            "version": t.version,
+            "content": t.content,
+            "created_at": created_at_str,
+        })
+
+    return ThoughtsResponseSchema(session_id=session_id, thoughts=thoughts_out)
+
+
+@router.get("/{session_id}/queue", response_model=QueueResponseSchema)
+async def get_queue(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> QueueResponseSchema:
+    session = await session_service.get_session(db, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    agents_map = {a.id: a.display_name for a in session.agents}
+    queue_entries = await session_service.get_queue(db, session_id)
+
+    queue_out = []
+    for q in queue_entries:
+        queue_out.append({
+            "agent_id": q.agent_id,
+            "agent_name": agents_map.get(q.agent_id, "Unknown"),
+            "priority_score": q.priority_score,
+            "novelty_tier": q.novelty_tier,
+            "justification": q.justification,
+            "position": q.position,
+        })
+
+    return QueueResponseSchema(session_id=session_id, queue=queue_out)
+
+
+@router.get("/{session_id}/summary", response_model=SummaryResponseSchema)
+async def get_summary(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> SummaryResponseSchema:
+    session = await session_service.get_session(db, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    summary = await session_service.get_summary(db, session_id)
+    if not summary:
+        raise HTTPException(status_code=404, detail="Summary not found")
+
+    created_at_str = summary.created_at.isoformat() if hasattr(summary.created_at, "isoformat") else str(summary.created_at)
+    
+    return SummaryResponseSchema(
+        id=summary.id,
+        session_id=summary.session_id,
+        termination_reason=summary.termination_reason,
+        content=summary.content,
+        created_at=created_at_str,
+    )
+
