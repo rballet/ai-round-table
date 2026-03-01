@@ -278,10 +278,10 @@ At any time, the host can trigger an immediate end via the UI. This behaves iden
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Next.js Frontend                                           │
-│  ┌──────────────┐  ┌─────────────┐  ┌──────────────────┐    │
-│  │ Poker Table  │  │ Argument    │  │ Session Setup &  │    │
-│  │ Canvas       │  │ Feed        │  │ Host Controls    │    │
-│  └──────────────┘  └─────────────┘  └──────────────────┘    │
+│  ┌──────────────-┐  ┌─────────────┐  ┌──────────────────┐   │
+│  │ 'Poker Table' │  │ Argument    │  │ Session Setup &  │   │
+│  │ Canvas        │  │ Feed        │  │ Host Controls    │   │
+│  └──────────────-┘  └─────────────┘  └──────────────────┘   │
 │           │                │                  │             │
 │           └────────────────┴──────────────────┘             │
 │                         WebSocket                           │
@@ -437,17 +437,17 @@ ModeratorState
 Summary
   id, session_id, scribe_agent_id, content, termination_reason, created_at
 
-ErrorEvent                                            (SPEC-302)
+ErrorEvent
   id, session_id, agent_id (nullable), code, message, created_at
   → LLM timeouts, parse failures, and orchestrator errors logged here.
 
-AgentPreset                                           (SPEC-401)
+AgentPreset
   id, display_name, persona_description, expertise,
   suggested_model, llm_provider, category, is_system (bool)
   → System presets seeded on startup (31 presets, 6 categories).
   → User presets created via POST /agents/presets; deletable (system presets protected).
 
-SessionTemplate                                       (SPEC-402)
+SessionTemplate
   id, name, description (nullable), agents (JSON), config (JSON), created_at
   → Topic excluded. Agents and config are snapshots — sessions derived from a
     template are fully independent after creation.
