@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -13,9 +14,12 @@ from engine.context import AgentContext, ContextBundle
 from engine.moderator import ModeratorEngine, ModeratorState, QueueCandidate
 from engine.queue_manager import QueueManager
 from llm.client import LLMClient
+from llm.errors import LLMError
 from models.agent import Agent
 from models.session import Session
-from services import argument_service, thought_service
+from services import argument_service, error_service, thought_service
+
+logger = logging.getLogger(__name__)
 
 
 class SessionOrchestrator:
@@ -187,14 +191,60 @@ class SessionOrchestrator:
             round_index=1,
             turn_index=0,
         )
-        async with self._session_factory() as db:
-            runner = AgentRunner(
-                session_id=self._session_id,
-                db=db,
-                llm_client=self._llm_client,
-                broadcast_manager=self._broadcast_manager,
+        try:
+            async with self._session_factory() as db:
+                runner = AgentRunner(
+                    session_id=self._session_id,
+                    db=db,
+                    llm_client=self._llm_client,
+                    broadcast_manager=self._broadcast_manager,
+                )
+                initial_thought = await runner.think(agent, context_bundle)
+        except LLMError as exc:
+            error_code = "LLM_TIMEOUT" if "timed out" in str(exc).lower() else "LLM_ERROR"
+            logger.warning(
+                "Think phase LLM error for agent %s in session %s: %s",
+                agent.id,
+                self._session_id,
+                exc,
             )
-            initial_thought = await runner.think(agent, context_bundle)
+            await self._emit_error(
+                code=error_code,
+                message=str(exc),
+                agent_id=agent.id,
+            )
+            async with self._session_factory() as db:
+                await error_service.log_error(
+                    db,
+                    session_id=self._session_id,
+                    code=error_code,
+                    message=str(exc),
+                    agent_id=agent.id,
+                )
+            # Emit THINK_END so the frontend is not left hanging (runner.think emits THINK_START
+            # but THINK_END is emitted in the finally block inside runner.think, so we do not
+            # double-emit here — the exception escapes after THINK_END in AgentRunner.think).
+            return
+        except Exception as exc:
+            logger.exception(
+                "Unexpected error in think phase for agent %s in session %s",
+                agent.id,
+                self._session_id,
+            )
+            await self._emit_error(
+                code="THINK_ERROR",
+                message=str(exc),
+                agent_id=agent.id,
+            )
+            async with self._session_factory() as db:
+                await error_service.log_error(
+                    db,
+                    session_id=self._session_id,
+                    code="THINK_ERROR",
+                    message=str(exc),
+                    agent_id=agent.id,
+                )
+            return
 
         if thought_inspector_enabled:
             await self._emit_event(
@@ -270,35 +320,79 @@ class SessionOrchestrator:
             },
         )
 
-        async with self._session_factory() as db:
-            runner = AgentRunner(
-                session_id=self._session_id,
-                db=db,
-                llm_client=self._llm_client,
-                broadcast_manager=self._broadcast_manager,
+        try:
+            async with self._session_factory() as db:
+                runner = AgentRunner(
+                    session_id=self._session_id,
+                    db=db,
+                    llm_client=self._llm_client,
+                    broadcast_manager=self._broadcast_manager,
+                )
+                latest_thought = await thought_service.get_latest_thought(
+                    db,
+                    session_id=self._session_id,
+                    agent_id=speaker.id,
+                )
+                transcript = await argument_service.list_arguments_for_session(
+                    db,
+                    session_id=self._session_id,
+                )
+                context_bundle = ContextBundle(
+                    topic=topic,
+                    prompt=prompt,
+                    supporting_context=supporting_context,
+                    agent=speaker,
+                    current_thought=(
+                        latest_thought.content if latest_thought is not None else None
+                    ),
+                    transcript=transcript,
+                    round_index=round_index,
+                    turn_index=turn_index,
+                )
+                argument = await runner.argue(speaker, context_bundle)
+        except LLMError as exc:
+            error_code = "LLM_TIMEOUT" if "timed out" in str(exc).lower() else "LLM_ERROR"
+            logger.warning(
+                "Argue phase LLM error for agent %s in session %s: %s",
+                speaker.id,
+                self._session_id,
+                exc,
             )
-            latest_thought = await thought_service.get_latest_thought(
-                db,
-                session_id=self._session_id,
+            await self._emit_error(
+                code=error_code,
+                message=str(exc),
                 agent_id=speaker.id,
             )
-            transcript = await argument_service.list_arguments_for_session(
-                db,
-                session_id=self._session_id,
+            async with self._session_factory() as db:
+                await error_service.log_error(
+                    db,
+                    session_id=self._session_id,
+                    code=error_code,
+                    message=str(exc),
+                    agent_id=speaker.id,
+                )
+            # Skip this argue turn but do not terminate the session.
+            return True
+        except Exception as exc:
+            logger.exception(
+                "Unexpected error in argue phase for agent %s in session %s",
+                speaker.id,
+                self._session_id,
             )
-            context_bundle = ContextBundle(
-                topic=topic,
-                prompt=prompt,
-                supporting_context=supporting_context,
-                agent=speaker,
-                current_thought=(
-                    latest_thought.content if latest_thought is not None else None
-                ),
-                transcript=transcript,
-                round_index=round_index,
-                turn_index=turn_index,
+            await self._emit_error(
+                code="ARGUE_ERROR",
+                message=str(exc),
+                agent_id=speaker.id,
             )
-            argument = await runner.argue(speaker, context_bundle)
+            async with self._session_factory() as db:
+                await error_service.log_error(
+                    db,
+                    session_id=self._session_id,
+                    code="ARGUE_ERROR",
+                    message=str(exc),
+                    agent_id=speaker.id,
+                )
+            return True
 
         await self._emit_event(
             "ARGUMENT_POSTED",
@@ -437,8 +531,50 @@ class SessionOrchestrator:
                             },
                         },
                     )
-            except Exception:
+            except LLMError as exc:
+                error_code = (
+                    "LLM_TIMEOUT" if "timed out" in str(exc).lower() else "LLM_ERROR"
+                )
+                logger.warning(
+                    "Update phase LLM error for agent %s in session %s: %s",
+                    agent.id,
+                    self._session_id,
+                    exc,
+                )
+                await self._emit_error(
+                    code=error_code,
+                    message=str(exc),
+                    agent_id=agent.id,
+                )
+                async with self._session_factory() as db:
+                    await error_service.log_error(
+                        db,
+                        session_id=self._session_id,
+                        code=error_code,
+                        message=str(exc),
+                        agent_id=agent.id,
+                    )
+                await self._emit_event("UPDATE_END", {"agent_id": agent.id})
+            except Exception as exc:
                 # Do not crash the gather if one agent update fails.
+                logger.exception(
+                    "Unexpected error in update phase for agent %s in session %s",
+                    agent.id,
+                    self._session_id,
+                )
+                await self._emit_error(
+                    code="UPDATE_ERROR",
+                    message=str(exc),
+                    agent_id=agent.id,
+                )
+                async with self._session_factory() as db:
+                    await error_service.log_error(
+                        db,
+                        session_id=self._session_id,
+                        code="UPDATE_ERROR",
+                        message=str(exc),
+                        agent_id=agent.id,
+                    )
                 await self._emit_event("UPDATE_END", {"agent_id": agent.id})
 
         await asyncio.gather(*[_update_one(agent) for agent in others])
@@ -523,9 +659,51 @@ class SessionOrchestrator:
                             "position_in_queue": position_in_queue,
                         },
                     )
-            except Exception:
+            except LLMError as exc:
+                error_code = (
+                    "LLM_TIMEOUT" if "timed out" in str(exc).lower() else "LLM_ERROR"
+                )
+                logger.warning(
+                    "Decide phase LLM error for agent %s in session %s: %s",
+                    agent.id,
+                    self._session_id,
+                    exc,
+                )
+                await self._emit_error(
+                    code=error_code,
+                    message=str(exc),
+                    agent_id=agent.id,
+                )
+                async with self._session_factory() as db:
+                    await error_service.log_error(
+                        db,
+                        session_id=self._session_id,
+                        code=error_code,
+                        message=str(exc),
+                        agent_id=agent.id,
+                    )
+                # Fallback: do not request token — safe default.
+            except Exception as exc:
                 # Do not crash the gather if one agent decide fails.
-                pass
+                logger.exception(
+                    "Unexpected error in decide phase for agent %s in session %s",
+                    agent.id,
+                    self._session_id,
+                )
+                await self._emit_error(
+                    code="DECIDE_ERROR",
+                    message=str(exc),
+                    agent_id=agent.id,
+                )
+                async with self._session_factory() as db:
+                    await error_service.log_error(
+                        db,
+                        session_id=self._session_id,
+                        code="DECIDE_ERROR",
+                        message=str(exc),
+                        agent_id=agent.id,
+                    )
+                # Fallback: do not request token — safe default.
 
         await asyncio.gather(*[_decide_one(agent) for agent in others])
         await self._broadcast_queue_snapshot(queue_manager)
@@ -577,6 +755,18 @@ class SessionOrchestrator:
         }
         await self._emit_event("SESSION_START", payload)
 
+    async def _emit_error(
+        self,
+        code: str,
+        message: str,
+        agent_id: str | None = None,
+    ) -> None:
+        """Broadcast an ERROR WebSocket event."""
+        payload: dict = {"code": code, "message": message}
+        if agent_id is not None:
+            payload["agent_id"] = agent_id
+        await self._emit_event("ERROR", payload)
+
     async def _emit_event(self, event_type: str, payload: dict) -> None:
         event = {
             "type": event_type,
@@ -596,28 +786,85 @@ class SessionOrchestrator:
         termination_reason: str,
         rounds_elapsed: int,
     ) -> None:
-        async with self._session_factory() as db:
-            runner = AgentRunner(
-                session_id=self._session_id,
-                db=db,
-                llm_client=self._llm_client,
-                broadcast_manager=self._broadcast_manager,
+        try:
+            async with self._session_factory() as db:
+                runner = AgentRunner(
+                    session_id=self._session_id,
+                    db=db,
+                    llm_client=self._llm_client,
+                    broadcast_manager=self._broadcast_manager,
+                )
+                transcript = await argument_service.list_arguments_for_session(
+                    db, session_id=self._session_id
+                )
+                context_bundle = ContextBundle(
+                    topic=topic,
+                    prompt=prompt,
+                    supporting_context=supporting_context,
+                    agent=scribe,
+                    transcript=transcript,
+                    round_index=0,
+                    turn_index=0,
+                )
+                summary = await runner.scribe(
+                    scribe, context_bundle, termination_reason
+                )
+        except LLMError as exc:
+            error_code = "LLM_TIMEOUT" if "timed out" in str(exc).lower() else "LLM_ERROR"
+            logger.warning(
+                "Scribe phase LLM error in session %s: %s",
+                self._session_id,
+                exc,
             )
-            transcript = await argument_service.list_arguments_for_session(
-                db, session_id=self._session_id
+            await self._emit_error(
+                code=error_code,
+                message=str(exc),
+                agent_id=scribe.id,
             )
-            context_bundle = ContextBundle(
-                topic=topic,
-                prompt=prompt,
-                supporting_context=supporting_context,
-                agent=scribe,
-                transcript=transcript,
-                round_index=0,
-                turn_index=0,
+            async with self._session_factory() as db:
+                await error_service.log_error(
+                    db,
+                    session_id=self._session_id,
+                    code=error_code,
+                    message=str(exc),
+                    agent_id=scribe.id,
+                )
+            await self._emit_event(
+                "SESSION_END",
+                {
+                    "reason": "error",
+                    "rounds_elapsed": rounds_elapsed,
+                    "summary_id": None,
+                },
             )
-            summary = await runner.scribe(
-                scribe, context_bundle, termination_reason
+            return
+        except Exception as exc:
+            logger.exception(
+                "Unexpected error in scribe phase in session %s",
+                self._session_id,
             )
+            await self._emit_error(
+                code="SCRIBE_ERROR",
+                message=str(exc),
+                agent_id=scribe.id,
+            )
+            async with self._session_factory() as db:
+                await error_service.log_error(
+                    db,
+                    session_id=self._session_id,
+                    code="SCRIBE_ERROR",
+                    message=str(exc),
+                    agent_id=scribe.id,
+                )
+            await self._emit_event(
+                "SESSION_END",
+                {
+                    "reason": "error",
+                    "rounds_elapsed": rounds_elapsed,
+                    "summary_id": None,
+                },
+            )
+            return
 
         payload = {
             "summary": {

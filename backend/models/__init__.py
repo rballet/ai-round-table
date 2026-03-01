@@ -6,6 +6,7 @@ from .argument import Argument
 from .queue_entry import QueueEntry
 from .moderator_state import ModeratorState
 from .summary import Summary
+from .error_event import ErrorEvent
 
 __all__ = [
     "Base",
@@ -16,4 +17,5 @@ __all__ = [
     "QueueEntry",
     "ModeratorState",
     "Summary",
+    "ErrorEvent",
 ]

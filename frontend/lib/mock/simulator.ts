@@ -184,6 +184,16 @@ export class WSSimulator {
           },
         },
       },
+      {
+        delayMs: 2950,
+        event: {
+          type: 'ERROR',
+          ...base(2950),
+          code: 'LLM_TIMEOUT',
+          message: 'Agent response timed out after 30s',
+          agent_id: 'agt_mod_1',
+        },
+      },
       { delayMs: 3000, event: { type: 'UPDATE_START', ...base(3000), agent_id: 'agt_part_2' } },
       { delayMs: 3060, event: { type: 'UPDATE_START', ...base(3060), agent_id: 'agt_part_3' } },
       { delayMs: 3360, event: { type: 'UPDATE_END', ...base(3360), agent_id: 'agt_part_2' } },

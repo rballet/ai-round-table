@@ -17,9 +17,10 @@ from schemas.api import (
     ThoughtsResponseSchema,
     QueueResponseSchema,
     SummaryResponseSchema,
+    ErrorsResponseSchema,
 )
 from schemas.session import SessionSchema
-from services import session_service
+from services import error_service, session_service
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -328,7 +329,7 @@ async def get_summary(
         raise HTTPException(status_code=404, detail="Summary not found")
 
     created_at_str = summary.created_at.isoformat() if hasattr(summary.created_at, "isoformat") else str(summary.created_at)
-    
+
     return SummaryResponseSchema(
         id=summary.id,
         session_id=summary.session_id,
@@ -336,4 +337,35 @@ async def get_summary(
         content=summary.content,
         created_at=created_at_str,
     )
+
+
+@router.get("/{session_id}/errors", response_model=ErrorsResponseSchema)
+async def get_errors(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> ErrorsResponseSchema:
+    session = await session_service.get_session(db, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    events = await error_service.get_errors_for_session(db, session_id)
+    errors_out = []
+    for ev in events:
+        created_at_str = (
+            ev.created_at.isoformat()
+            if hasattr(ev.created_at, "isoformat")
+            else str(ev.created_at)
+        )
+        errors_out.append(
+            {
+                "id": ev.id,
+                "session_id": ev.session_id,
+                "agent_id": ev.agent_id,
+                "code": ev.code,
+                "message": ev.message,
+                "created_at": created_at_str,
+            }
+        )
+
+    return ErrorsResponseSchema(session_id=session_id, errors=errors_out)
 

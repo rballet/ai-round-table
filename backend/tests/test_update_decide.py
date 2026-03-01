@@ -506,10 +506,13 @@ async def test_agent_runner_decide_retries_on_malformed_json_then_succeeds(
 
 
 @pytest.mark.asyncio
-async def test_agent_runner_decide_raises_after_two_malformed_json_responses(
+async def test_agent_runner_decide_returns_fallback_after_two_malformed_json_responses(
     db: AsyncSession,
 ):
-    """decide() should raise ValueError when both initial and retry responses are invalid."""
+    """decide() must return a safe fallback (request_token=False) when both responses are invalid JSON.
+
+    Per SPEC-302, decide() must not raise — the orchestration loop must continue uninterrupted.
+    """
     from engine.agent_runner import AgentRunner
 
     session = await session_service.create_session(db, _valid_request())
@@ -549,10 +552,13 @@ async def test_agent_runner_decide_raises_after_two_malformed_json_responses(
         turn_index=1,
     )
 
-    with pytest.raises(ValueError, match="not valid JSON"):
-        await runner.decide(agent_ctx, bundle)
+    result = await runner.decide(agent_ctx, bundle)
 
+    # Must have attempted exactly 2 LLM calls (initial + one retry).
     assert provider.calls == 2
+    # Fallback must be the safe default: do not request the token.
+    assert result.request_token is False
+    assert result.novelty_tier == "reinforcement"
 
 
 # ---------------------------------------------------------------------------

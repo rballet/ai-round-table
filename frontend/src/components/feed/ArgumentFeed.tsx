@@ -1,16 +1,21 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { LiveArgument } from '@/store/sessionStore';
+import { AnimatePresence } from 'framer-motion';
+import { LiveArgument, LiveError } from '@/store/sessionStore';
+import { Agent } from 'shared/types/agent';
 import { ArgumentBubble } from './ArgumentBubble';
+import { ErrorNotification } from './ErrorNotification';
 
 interface ArgumentFeedProps {
   argumentsList: LiveArgument[];
+  errors: LiveError[];
+  agents: Agent[];
 }
 
 const AUTO_SCROLL_THRESHOLD_PX = 72;
 
-export function ArgumentFeed({ argumentsList }: ArgumentFeedProps) {
+export function ArgumentFeed({ argumentsList, errors, agents }: ArgumentFeedProps) {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [autoScrollPaused, setAutoScrollPaused] = useState(false);
 
@@ -22,11 +27,13 @@ export function ArgumentFeed({ argumentsList }: ArgumentFeedProps) {
     node.scrollTo({ top: node.scrollHeight, behavior });
   }, []);
 
+  const totalItems = argumentsList.length + errors.length;
+
   useEffect(() => {
     if (!autoScrollPaused) {
-      scrollToBottom(argumentsList.length <= 1 ? 'auto' : 'smooth');
+      scrollToBottom(totalItems <= 1 ? 'auto' : 'smooth');
     }
-  }, [argumentsList.length, autoScrollPaused, scrollToBottom]);
+  }, [totalItems, autoScrollPaused, scrollToBottom]);
 
   const handleScroll = useCallback(() => {
     const node = scrollContainerRef.current;
@@ -37,12 +44,14 @@ export function ArgumentFeed({ argumentsList }: ArgumentFeedProps) {
     setAutoScrollPaused(distanceFromBottom > AUTO_SCROLL_THRESHOLD_PX);
   }, []);
 
+  const isEmpty = argumentsList.length === 0 && errors.length === 0;
+
   return (
     <section className="flex h-[480px] flex-col rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <header className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-900">Argument Feed</h2>
         <div className="flex items-center gap-2">
-          {autoScrollPaused && argumentsList.length > 0 && (
+          {autoScrollPaused && !isEmpty && (
             <button
               type="button"
               onClick={() => {
@@ -57,6 +66,11 @@ export function ArgumentFeed({ argumentsList }: ArgumentFeedProps) {
           <span className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-600">
             {argumentsList.length} entries
           </span>
+          {errors.length > 0 && (
+            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+              {errors.length} {errors.length === 1 ? 'error' : 'errors'}
+            </span>
+          )}
         </div>
       </header>
 
@@ -65,13 +79,24 @@ export function ArgumentFeed({ argumentsList }: ArgumentFeedProps) {
         onScroll={handleScroll}
         className="flex-1 space-y-3 overflow-y-auto pr-1"
         data-testid="argument-feed-scroll-container"
+        aria-live="polite"
+        aria-label="Argument and error feed"
       >
-        {argumentsList.length > 0 ? (
-          argumentsList.map((argument) => <ArgumentBubble key={argument.id} argument={argument} />)
-        ) : (
+        {isEmpty ? (
           <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">
             Waiting for arguments...
           </div>
+        ) : (
+          <>
+            {argumentsList.map((argument) => (
+              <ArgumentBubble key={argument.id} argument={argument} />
+            ))}
+            <AnimatePresence initial={false}>
+              {errors.map((error) => (
+                <ErrorNotification key={error.id} error={error} agents={agents} />
+              ))}
+            </AnimatePresence>
+          </>
         )}
       </div>
     </section>

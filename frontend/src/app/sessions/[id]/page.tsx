@@ -10,6 +10,7 @@ import { ThoughtInspector } from '@/components/table/ThoughtInspector';
 import { ArgumentFeed } from '@/components/feed/ArgumentFeed';
 import { SummaryPanel } from '@/components/feed/SummaryPanel';
 import { SessionStatus } from '@/components/controls/SessionStatus';
+import { ToastContainer } from '@/components/ui/Toast';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useSessionStore } from '@/store/sessionStore';
 import type { SessionStoreState } from '@/store/sessionStore';
@@ -33,6 +34,8 @@ const selectSetSummary = (s: SessionStoreState) => s.setSummary;
 const selectAgentThoughts = (s: SessionStoreState) => s.agentThoughts;
 const selectThoughtInspectorEnabled = (s: SessionStoreState) => s.thoughtInspectorEnabled;
 const selectSetAgentThoughts = (s: SessionStoreState) => s.setAgentThoughts;
+const selectErrors = (s: SessionStoreState) => s.errors;
+const selectClearError = (s: SessionStoreState) => s.clearError;
 
 export default function LiveSessionPage() {
   const params = useParams<{ id: string | string[] }>();
@@ -67,6 +70,8 @@ export default function LiveSessionPage() {
   const agentThoughts = useSessionStore(selectAgentThoughts);
   const thoughtInspectorEnabled = useSessionStore(selectThoughtInspectorEnabled);
   const setAgentThoughts = useSessionStore(selectSetAgentThoughts);
+  const errors = useSessionStore(selectErrors);
+  const clearError = useSessionStore(selectClearError);
 
   const { isConnected, connectionError } = useWebSocket(sessionId);
 
@@ -361,7 +366,7 @@ export default function LiveSessionPage() {
             )}
           </section>
 
-          <ArgumentFeed argumentsList={argumentsList} />
+          <ArgumentFeed argumentsList={argumentsList} errors={errors} agents={agents} />
         </div>
       </div>
 
@@ -371,6 +376,8 @@ export default function LiveSessionPage() {
         terminationReason={session?.termination_reason ?? null}
         onClose={closeSummaryPanel}
       />
+
+      <ToastContainer errors={errors} onDismiss={clearError} />
     </main>
   );
 }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -18,6 +19,8 @@ from models.argument import Argument
 from models.summary import Summary
 from models.thought import Thought
 from services import argument_service, thought_service, session_service
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -159,7 +162,16 @@ class AgentRunner:
         )
         retry_parsed = self._parse_decide_response(retry_completion)
         if retry_parsed is None:
-            raise ValueError("Decide response was not valid JSON.")
+            logger.warning(
+                "Decide parse failed twice for agent %s in session %s; using safe fallback.",
+                "unknown",
+                self._session_id,
+            )
+            return DecideResult(
+                request_token=False,
+                novelty_tier="reinforcement",
+                justification=None,
+            )
         return retry_parsed
 
     async def _broadcast(self, event_type: str, payload: dict) -> None:

@@ -41,7 +41,7 @@ const defaultWizard: WizardState = {
 // Live session types (SPEC-105: live session UI)
 // ---------------------------------------------------------------------------
 
-export type AgentRuntimeStatus = 'idle' | 'thinking' | 'active' | 'updating';
+export type AgentRuntimeStatus = 'idle' | 'thinking' | 'active' | 'updating' | 'errored';
 export type ConvergenceRuntimeStatus = 'open' | 'converging' | 'capped' | null;
 
 export interface LiveArgument {
@@ -58,6 +58,14 @@ export interface LiveSummary {
   id: string;
   content: string;
   termination_reason: Exclude<TerminationReason, null>;
+}
+
+export interface LiveError {
+  id: string;
+  code: string;
+  message: string;
+  agent_id?: string;
+  timestamp: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -132,6 +140,7 @@ export interface SessionStoreState {
   connectionError: string | null;
   agentThoughts: Record<string, AgentThought[]>;
   thoughtInspectorEnabled: boolean;
+  errors: LiveError[];
 
   // --- Wizard (SPEC-101-FE) ---
   wizard: WizardState;
@@ -149,6 +158,7 @@ export interface SessionStoreState {
   closeSummaryPanel: () => void;
   setSummary: (summary: LiveSummary) => void;
   setAgentThoughts: (thoughts: AgentThought[]) => void;
+  clearError: (id: string) => void;
 
   // --- Actions: wizard ---
   setWizardStep: (step: 1 | 2 | 3) => void;
@@ -183,6 +193,7 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
   connectionError: null,
   agentThoughts: {},
   thoughtInspectorEnabled: false,
+  errors: [],
 
   // Wizard
   wizard: {
@@ -213,6 +224,7 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
       connectionError: null,
       agentThoughts: {},
       thoughtInspectorEnabled: session.config.thought_inspector_enabled,
+      errors: [],
     }),
 
   setConnectionState: (isConnected, error = null) =>
@@ -388,10 +400,29 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
               }
               : null,
           };
+        case 'ERROR': {
+          const newError: LiveError = {
+            id: `err_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            code: event.code,
+            message: event.message,
+            agent_id: event.agent_id,
+            timestamp: Date.now(),
+          };
+          const updatedStatuses = event.agent_id
+            ? { ...state.agentStatuses, [event.agent_id]: 'errored' as AgentRuntimeStatus }
+            : state.agentStatuses;
+          return {
+            errors: [...state.errors, newError],
+            agentStatuses: updatedStatuses,
+          };
+        }
         default:
           return state;
       }
     }),
+
+  clearError: (id) =>
+    set((state) => ({ errors: state.errors.filter((e) => e.id !== id) })),
 
   // --- Wizard actions ---
   setWizardStep: (step) =>

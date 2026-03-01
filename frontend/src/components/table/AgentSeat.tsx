@@ -12,6 +12,7 @@ const statusLabel: Record<AgentRuntimeStatus, string> = {
   thinking: 'Thinking',
   active: 'Speaking',
   updating: 'Updating',
+  errored: 'Error',
 };
 
 const statusClass: Record<AgentRuntimeStatus, string> = {
@@ -19,6 +20,7 @@ const statusClass: Record<AgentRuntimeStatus, string> = {
   thinking: 'bg-amber-100 text-amber-800',
   active: 'bg-emerald-100 text-emerald-800',
   updating: 'bg-sky-100 text-sky-800',
+  errored: 'text-red-400 bg-red-500/10 border border-red-500/30',
 };
 
 export function AgentSeat({ agent, status, handRaised }: AgentSeatProps) {
@@ -26,9 +28,16 @@ export function AgentSeat({ agent, status, handRaised }: AgentSeatProps) {
   const glowClass =
     status === 'active'
       ? 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-white shadow-[0_0_28px_rgba(16,185,129,0.45)]'
-      : '';
+      : status === 'errored'
+        ? 'ring-2 ring-red-400 ring-offset-2 ring-offset-white'
+        : '';
   const pulseClass = status === 'updating' ? 'animate-pulse' : '';
-  const nameClass = status === 'active' ? 'text-emerald-700' : 'text-slate-900';
+  const nameClass =
+    status === 'active'
+      ? 'text-emerald-700'
+      : status === 'errored'
+        ? 'text-red-600'
+        : 'text-slate-900';
 
   return (
     <div
@@ -44,6 +53,15 @@ export function AgentSeat({ agent, status, handRaised }: AgentSeatProps) {
         {initial}
         {status === 'thinking' && (
           <span className="absolute -right-1 -top-1 h-3 w-3 animate-spin rounded-full border border-slate-700 border-t-transparent bg-white" />
+        )}
+        {status === 'errored' && (
+          <span
+            className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white"
+            aria-label="Agent errored"
+            title="Agent encountered an error"
+          >
+            !
+          </span>
         )}
         {handRaised && (
           <span

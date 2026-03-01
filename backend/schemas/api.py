@@ -56,3 +56,15 @@ class SummaryResponseSchema(BaseModel):
 
 class PresetsResponseSchema(BaseModel):
     presets: List[AgentPresetSchema]
+
+class ErrorEventSchema(BaseModel):
+    id: str
+    session_id: str
+    agent_id: Optional[str]
+    code: str
+    message: str
+    created_at: str
+
+class ErrorsResponseSchema(BaseModel):
+    session_id: str
+    errors: List[ErrorEventSchema]
