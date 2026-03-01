@@ -100,6 +100,124 @@ const MOCK_AGENTS: Agent[] = [
     llm_model: 'gpt-4o',
     role: 'participant',
   },
+  // Agents for the completed session (sess_mock_003)
+  {
+    id: 'agent_mod_003',
+    session_id: 'sess_mock_003',
+    display_name: 'Nova',
+    persona_description: 'A neutral moderator who structures the debate and keeps it on track.',
+    expertise: 'Facilitation and structured debate',
+    llm_provider: 'anthropic',
+    llm_model: 'claude-opus-4-5',
+    role: 'moderator',
+  },
+  {
+    id: 'agent_scr_003',
+    session_id: 'sess_mock_003',
+    display_name: 'Lumen',
+    persona_description: 'Captures the key points and synthesises conclusions.',
+    expertise: 'Summarisation and synthesis',
+    llm_provider: 'anthropic',
+    llm_model: 'claude-sonnet-4-6',
+    role: 'scribe',
+  },
+  {
+    id: 'agent_par_003',
+    session_id: 'sess_mock_003',
+    display_name: 'The Open Advocate',
+    persona_description: 'Strongly believes open source AI leads to better outcomes for humanity.',
+    expertise: 'Open source software and collaborative development',
+    llm_provider: 'openai',
+    llm_model: 'gpt-4o',
+    role: 'participant',
+  },
+  {
+    id: 'agent_par_004',
+    session_id: 'sess_mock_003',
+    display_name: 'The Realist',
+    persona_description: 'Argues that closed source AI allows for better safety and quality control.',
+    expertise: 'Enterprise software and AI safety',
+    llm_provider: 'anthropic',
+    llm_model: 'claude-opus-4-5',
+    role: 'participant',
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Transcript fixture for the completed session (sess_mock_003)
+// ---------------------------------------------------------------------------
+
+const MOCK_TRANSCRIPT_003 = [
+  {
+    id: 'arg_003_001',
+    agent_id: 'agent_mod_003',
+    agent_name: 'Nova',
+    round_index: 1,
+    turn_index: 1,
+    content:
+      "Welcome to today's debate on open source versus closed source AI development. We'll explore both sides rigorously. The Realist will open, followed by The Open Advocate. Let us begin.",
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 3 + 1000 * 60 * 1).toISOString(),
+  },
+  {
+    id: 'arg_003_002',
+    agent_id: 'agent_par_004',
+    agent_name: 'The Realist',
+    round_index: 1,
+    turn_index: 2,
+    content:
+      'Closed source AI allows organisations to invest heavily in safety measures, alignment research, and quality control without the risk of bad actors exploiting published model weights. The dual-use risk of open weights is not theoretical — we have already seen misuse of open models for disinformation and harmful content generation. Responsible release requires keeping sensitive capabilities behind controlled access.',
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 3 + 1000 * 60 * 5).toISOString(),
+  },
+  {
+    id: 'arg_003_003',
+    agent_id: 'agent_par_003',
+    agent_name: 'The Open Advocate',
+    round_index: 1,
+    turn_index: 3,
+    content:
+      "Open source AI democratises access to powerful tools, enabling researchers at underfunded institutions, independent developers, and civil society to audit, improve, and build upon frontier capabilities. History shows that open source software — from Linux to the web stack — enabled far more innovation than any closed alternative. The safety argument is weak because security through obscurity has never proven robust; adversaries will find exploits regardless.",
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 3 + 1000 * 60 * 10).toISOString(),
+  },
+  {
+    id: 'arg_003_004',
+    agent_id: 'agent_par_004',
+    agent_name: 'The Realist',
+    round_index: 2,
+    turn_index: 1,
+    content:
+      "The Linux comparison is flawed. Operating system kernels don't carry the same dual-use risk as a model capable of generating bioweapon synthesis routes or targeted propaganda at scale. Closed source isn't security through obscurity — it's access control. You can audit safety practices without publishing weights. Responsible labs publish research, red-team findings, and safety evaluations. The weights themselves are a different matter.",
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 3 + 1000 * 60 * 15).toISOString(),
+  },
+  {
+    id: 'arg_003_005',
+    agent_id: 'agent_par_003',
+    agent_name: 'The Open Advocate',
+    round_index: 2,
+    turn_index: 2,
+    content:
+      "That distinction is fair. I'll concede that frontier models with bioweapon-relevant knowledge deserve a different treatment. However, the vast majority of AI capability — language understanding, reasoning, coding assistance — does not fall into that category. A tiered approach could preserve open access for general-purpose models while imposing access controls on genuinely dangerous specialised capabilities. The debate shouldn't be binary.",
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 3 + 1000 * 60 * 20).toISOString(),
+  },
+  {
+    id: 'arg_003_006',
+    agent_id: 'agent_scr_003',
+    agent_name: 'Lumen',
+    round_index: 3,
+    turn_index: 1,
+    content:
+      "I'm noting an emerging area of agreement: both participants accept that a binary open/closed dichotomy may be inadequate. The Realist acknowledges the value of open publication of safety research; The Open Advocate concedes that frontier dual-use models may warrant restricted access. The debate is converging towards a capability-tiered licensing framework.",
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 3 + 1000 * 60 * 25).toISOString(),
+  },
+  {
+    id: 'arg_003_007',
+    agent_id: 'agent_mod_003',
+    agent_name: 'Nova',
+    round_index: 3,
+    turn_index: 2,
+    content:
+      'I concur with Lumen\'s synthesis. Both positions have converged on the principle that governance of AI development should be proportional to risk. I am declaring consensus on this core principle. Final remarks from each participant before Lumen produces the summary.',
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 3 + 1000 * 60 * 30).toISOString(),
+  },
 ];
 
 const MOCK_PRESETS = [
@@ -279,9 +397,13 @@ export const handlers = [
     });
   }),
 
-  http.get('/sessions/:id/transcript', ({ params }) =>
-    HttpResponse.json({ session_id: params.id, arguments: [] })
-  ),
+  http.get('/sessions/:id/transcript', ({ params }) => {
+    const id = String(params.id);
+    if (id === 'sess_mock_003') {
+      return HttpResponse.json({ session_id: id, arguments: MOCK_TRANSCRIPT_003 });
+    }
+    return HttpResponse.json({ session_id: id, arguments: [] });
+  }),
 
   http.get('/sessions/:id/thoughts', ({ params }) =>
     HttpResponse.json({ session_id: params.id, thoughts: [] })
@@ -297,16 +419,27 @@ export const handlers = [
 
   http.post('/sessions/:id/end', () => HttpResponse.json({ status: 'ending' })),
 
-  http.get('/sessions/:id/summary', ({ params }) =>
-    HttpResponse.json({
+  http.get('/sessions/:id/summary', ({ params }) => {
+    const id = String(params.id);
+    if (id === 'sess_mock_003') {
+      return HttpResponse.json({
+        id: 'sum_mock_003',
+        session_id: id,
+        termination_reason: 'consensus',
+        content:
+          '## Summary\n\nThe debate converged on a nuanced position: the binary open/closed framing is inadequate for governing AI development.\n\n**Key points of agreement:**\n- General-purpose models (coding, language, reasoning) benefit from open release and community auditing\n- Frontier dual-use models with potential for mass-harm (e.g. bioweapons uplift) warrant access controls\n- Safety research, red-team findings, and evaluations should remain publicly available regardless of weight access\n\n**Conclusion:** A capability-tiered licensing framework — open weights for low-risk models, restricted access for high-risk dual-use capabilities — emerged as the consensus position. Both participants acknowledged that proportionality to risk, rather than uniform openness or uniform restriction, is the correct governance principle.',
+        created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+      });
+    }
+    return HttpResponse.json({
       id: 'sum_mock_001',
-      session_id: params.id,
+      session_id: id,
       termination_reason: 'consensus',
       content:
         '## Summary\n\nAfter structured debate, participants reached consensus that AI regulation requires a multi-stakeholder approach combining government oversight with industry self-regulation.',
       created_at: new Date().toISOString(),
-    })
-  ),
+    });
+  }),
 
   http.get('/agents/presets', () =>
     HttpResponse.json({ presets: MOCK_PRESETS })

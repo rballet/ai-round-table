@@ -11,9 +11,11 @@ import { ArgumentFeed } from '@/components/feed/ArgumentFeed';
 import { SummaryPanel } from '@/components/feed/SummaryPanel';
 import { SessionStatus } from '@/components/controls/SessionStatus';
 import { ToastContainer } from '@/components/ui/Toast';
+import { CompletedSessionView } from '@/components/history/CompletedSessionView';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useSessionStore } from '@/store/sessionStore';
 import type { SessionStoreState } from '@/store/sessionStore';
+import type { SessionResponse, TranscriptResponse, SummaryResponse } from 'shared/types/api';
 
 const selectSession = (s: SessionStoreState) => s.session;
 const selectAgents = (s: SessionStoreState) => s.agents;
@@ -37,20 +39,83 @@ const selectSetAgentThoughts = (s: SessionStoreState) => s.setAgentThoughts;
 const selectErrors = (s: SessionStoreState) => s.errors;
 const selectClearError = (s: SessionStoreState) => s.clearError;
 
-export default function LiveSessionPage() {
-  const params = useParams<{ id: string | string[] }>();
-  const router = useRouter();
-  const sessionId = useMemo(() => {
-    const raw = params?.id;
-    return Array.isArray(raw) ? raw[0] : raw ?? null;
-  }, [params]);
+// ---------------------------------------------------------------------------
+// Completed session loader — fetches transcript + summary outside of the store
+// ---------------------------------------------------------------------------
 
+interface CompletedData {
+  sessionResponse: SessionResponse;
+  transcript: TranscriptResponse | null;
+  summary: SummaryResponse | null;
+}
+
+function useCompletedSession(sessionId: string | null) {
+  const [data, setData] = useState<CompletedData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!sessionId) return;
+
+    let mounted = true;
+    setLoading(true);
+    setError(null);
+
+    api
+      .getSession(sessionId)
+      .then(async (sessionRes) => {
+        if (!mounted) return;
+        if (sessionRes.status !== 'ended') {
+          // Not a completed session; caller will handle the live path
+          setData({ sessionResponse: sessionRes, transcript: null, summary: null });
+          return;
+        }
+
+        const [transcriptRes, summaryRes] = await Promise.allSettled([
+          api.getTranscript(sessionId),
+          api.getSummary(sessionId),
+        ]);
+
+        if (!mounted) return;
+
+        setData({
+          sessionResponse: sessionRes,
+          transcript: transcriptRes.status === 'fulfilled' ? transcriptRes.value : null,
+          summary: summaryRes.status === 'fulfilled' ? summaryRes.value : null,
+        });
+      })
+      .catch((err) => {
+        if (!mounted) return;
+        setError(err instanceof Error ? err.message : 'Failed to load session');
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [sessionId]);
+
+  return { data, loading, error };
+}
+
+// ---------------------------------------------------------------------------
+// Live session inner component — only mounts when status is NOT 'ended'
+// ---------------------------------------------------------------------------
+
+interface LiveSessionInnerProps {
+  sessionId: string;
+}
+
+function LiveSessionInner({ sessionId }: LiveSessionInnerProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [startPrompt, setStartPrompt] = useState('');
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [thoughtInspectorOpen, setThoughtInspectorOpen] = useState(true);
 
+  const router = useRouter();
   const session = useSessionStore(selectSession);
   const agents = useSessionStore(selectAgents);
   const argumentsList = useSessionStore(selectArguments);
@@ -76,18 +141,12 @@ export default function LiveSessionPage() {
   const { isConnected, connectionError } = useWebSocket(sessionId);
 
   useEffect(() => {
-    if (!sessionId) {
-      return;
-    }
-
     let mounted = true;
 
     api
       .getSession(sessionId)
       .then((response) => {
-        if (!mounted) {
-          return;
-        }
+        if (!mounted) return;
         initializeSession(response);
         setStartPrompt(response.topic);
 
@@ -99,7 +158,7 @@ export default function LiveSessionPage() {
                 setSummary({
                   id: summaryRes.id,
                   content: summaryRes.content,
-                  termination_reason: summaryRes.termination_reason as any,
+                  termination_reason: summaryRes.termination_reason as 'consensus' | 'cap' | 'host',
                 });
               }
             })
@@ -129,9 +188,7 @@ export default function LiveSessionPage() {
         }
       })
       .catch((error) => {
-        if (!mounted) {
-          return;
-        }
+        if (!mounted) return;
         setLoadError(error instanceof Error ? error.message : 'Failed to load session');
       });
 
@@ -141,7 +198,6 @@ export default function LiveSessionPage() {
   }, [sessionId, initializeSession, setSummary, setAgentThoughts]);
 
   const handleStartSession = useCallback(async () => {
-    if (!sessionId) return;
     setIsStarting(true);
     setStartError(null);
     try {
@@ -154,7 +210,6 @@ export default function LiveSessionPage() {
   }, [sessionId, startPrompt, session?.topic]);
 
   const handlePauseSession = useCallback(async () => {
-    if (!sessionId) return;
     try {
       await api.pauseSession(sessionId);
     } catch (err) {
@@ -163,7 +218,6 @@ export default function LiveSessionPage() {
   }, [sessionId]);
 
   const handleResumeSession = useCallback(async () => {
-    if (!sessionId) return;
     try {
       await api.resumeSession(sessionId);
     } catch (err) {
@@ -172,7 +226,6 @@ export default function LiveSessionPage() {
   }, [sessionId]);
 
   const handleEndSession = useCallback(async () => {
-    if (!sessionId) return;
     try {
       await api.endSession(sessionId);
     } catch (err) {
@@ -181,7 +234,6 @@ export default function LiveSessionPage() {
   }, [sessionId]);
 
   const handleDeleteSession = useCallback(async () => {
-    if (!sessionId) return;
     if (!confirm('Are you sure you want to delete this session? This action cannot be undone.')) return;
     try {
       await api.deleteSession(sessionId);
@@ -190,16 +242,6 @@ export default function LiveSessionPage() {
       console.error('Failed to delete session:', err);
     }
   }, [sessionId, router]);
-
-  if (!sessionId) {
-    return (
-      <main className="min-h-screen bg-slate-50 px-6 py-10 text-slate-900">
-        <p className="mx-auto max-w-6xl rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
-          Missing session id
-        </p>
-      </main>
-    );
-  }
 
   if (!session && !loadError) {
     return (
@@ -283,7 +325,7 @@ export default function LiveSessionPage() {
                 Force End
               </button>
             )}
-            <div className="flex-1" /> {/* Spacer */}
+            <div className="flex-1" />
             <Link
               href="/sessions/new"
               className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-800 hover:bg-slate-200"
@@ -301,7 +343,6 @@ export default function LiveSessionPage() {
           {connectionError && <p className="text-xs text-rose-600">{connectionError}</p>}
         </header>
 
-        {/* Start Session panel — only shown when session is in configured state */}
         {isConfigured && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 space-y-4">
             <div>
@@ -380,4 +421,80 @@ export default function LiveSessionPage() {
       <ToastContainer errors={errors} onDismiss={clearError} />
     </main>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Page component — branches on session status
+// ---------------------------------------------------------------------------
+
+export default function SessionPage() {
+  const params = useParams<{ id: string | string[] }>();
+  const router = useRouter();
+  const sessionId = useMemo(() => {
+    const raw = params?.id;
+    return Array.isArray(raw) ? raw[0] : raw ?? null;
+  }, [params]);
+
+  const { data, loading, error } = useCompletedSession(sessionId);
+
+  const handleDeleteCompleted = useCallback(async () => {
+    if (!sessionId) return;
+    if (!confirm('Are you sure you want to delete this session? This action cannot be undone.')) return;
+    try {
+      await api.deleteSession(sessionId);
+      router.push('/');
+    } catch (err) {
+      console.error('Failed to delete session:', err);
+    }
+  }, [sessionId, router]);
+
+  if (!sessionId) {
+    return (
+      <main className="min-h-screen bg-slate-50 px-6 py-10 text-slate-900">
+        <p className="mx-auto max-w-6xl rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+          Missing session id
+        </p>
+      </main>
+    );
+  }
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 px-6 py-10">
+        <div className="max-w-5xl mx-auto space-y-3" role="status" aria-label="Loading session">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-16 rounded-xl bg-zinc-200 dark:bg-zinc-800 animate-pulse"
+            />
+          ))}
+        </div>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="min-h-screen bg-slate-50 px-6 py-10 text-slate-900">
+        <p className="mx-auto max-w-6xl rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+          {error}
+        </p>
+      </main>
+    );
+  }
+
+  // Route to read-only completed view for ended sessions
+  if (data?.sessionResponse.status === 'ended') {
+    return (
+      <CompletedSessionView
+        session={data.sessionResponse}
+        transcript={data.transcript}
+        summary={data.summary}
+        onDelete={handleDeleteCompleted}
+      />
+    );
+  }
+
+  // Live session path — WS connection happens inside LiveSessionInner
+  return <LiveSessionInner sessionId={sessionId} />;
 }
