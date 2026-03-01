@@ -165,23 +165,16 @@ class SessionOrchestrator:
 
         if not self._session_end_emitted:
             # Fallback: queue exhausted without a scribe (or scribe did not emit SESSION_END).
+            reason = self._termination_reason or "cap"
+            await self._mark_session_ended(reason)
             await self._emit_event(
                 "SESSION_END",
                 {
-                    "reason": self._termination_reason or "cap",
+                    "reason": reason,
                     "rounds_elapsed": rounds_elapsed,
                     "summary_id": None,
                 },
             )
-            async with self._session_factory() as db:
-                result = await db.execute(
-                    select(Session).where(Session.id == self._session_id)
-                )
-                session_obj = result.scalar_one_or_none()
-                if session_obj:
-                    session_obj.status = "ended"
-                    session_obj.termination_reason = self._termination_reason or "cap"
-                    await db.commit()
 
     async def _phase_think(
         self,
@@ -794,6 +787,18 @@ class SessionOrchestrator:
         }
         await self._emit_event("SESSION_START", payload)
 
+    async def _mark_session_ended(self, termination_reason: str) -> None:
+        """Persist session.status = 'ended' to the DB."""
+        async with self._session_factory() as db:
+            result = await db.execute(
+                select(Session).where(Session.id == self._session_id)
+            )
+            session_obj = result.scalar_one_or_none()
+            if session_obj:
+                session_obj.status = "ended"
+                session_obj.termination_reason = termination_reason
+                await db.commit()
+
     async def _emit_error(
         self,
         code: str,
@@ -869,6 +874,7 @@ class SessionOrchestrator:
                     agent_id=scribe.id,
                 )
             self._session_end_emitted = True
+            await self._mark_session_ended("error")
             await self._emit_event(
                 "SESSION_END",
                 {
@@ -897,6 +903,7 @@ class SessionOrchestrator:
                     agent_id=scribe.id,
                 )
             self._session_end_emitted = True
+            await self._mark_session_ended("error")
             await self._emit_event(
                 "SESSION_END",
                 {

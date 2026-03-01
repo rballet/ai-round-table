@@ -15,7 +15,7 @@ def build_think_messages(context_bundle: ContextBundle) -> list[Message]:
     supporting_context_block = ""
     if context_bundle.supporting_context:
         supporting_context_block = (
-            f"\nSupporting context:\n{context_bundle.supporting_context.strip()}\n"
+            f"\n<supporting_context>\n{context_bundle.supporting_context.strip()}\n</supporting_context>\n"
         )
 
     system_message = (

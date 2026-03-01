@@ -762,24 +762,24 @@ export class WSSimulator {
       {
         delayMs: 12120,
         event: {
-          type: 'SESSION_END',
-          ...base(12120),
-          reason: 'consensus',
-          rounds_elapsed: 2,
-          summary_id: 'sum_mock_204',
-        },
-      },
-      {
-        delayMs: 12310,
-        event: {
           type: 'SUMMARY_POSTED',
-          ...base(12310),
+          ...base(12120),
           summary: {
             id: 'sum_mock_204',
             content:
               '## Session Summary\n\nConsensus: keep a modular monolith now, add objective extraction gates, and revisit service boundaries after measurable pressure.',
             termination_reason: 'consensus',
           },
+        },
+      },
+      {
+        delayMs: 12310,
+        event: {
+          type: 'SESSION_END',
+          ...base(12310),
+          reason: 'consensus',
+          rounds_elapsed: 2,
+          summary_id: 'sum_mock_204',
         },
       },
     ];

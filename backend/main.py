@@ -12,6 +12,7 @@ app = FastAPI(title="AI Round Table API", version="0.1.0")
 app.state.broadcast_manager = BroadcastManager()
 app.state.llm_client = LLMClient()
 app.state.orchestrator_tasks = {}
+app.state.active_orchestrators = {}
 app.state.session_factory = AsyncSessionLocal
 
 app.add_middleware(

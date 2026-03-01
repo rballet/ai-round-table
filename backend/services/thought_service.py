@@ -17,7 +17,10 @@ async def save_thought(
     content: str,
 ) -> Thought:
     existing_max_version = await db.execute(
-        select(func.max(Thought.version)).where(Thought.agent_id == agent_id)
+        select(func.max(Thought.version)).where(
+            Thought.session_id == session_id,
+            Thought.agent_id == agent_id,
+        )
     )
     current_version = existing_max_version.scalar_one_or_none() or 0
 

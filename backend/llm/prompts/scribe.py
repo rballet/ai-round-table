@@ -28,14 +28,15 @@ Do not invent points that were not made.
 """
 
     if context_bundle.supporting_context:
-        system_prompt += f"\n\nSupporting facts/context for the topic:\n{context_bundle.supporting_context}\n"
+        system_prompt += f"\n\n<supporting_context>\n{context_bundle.supporting_context.strip()}\n</supporting_context>\n"
 
     transcript_text = ""
     for arg in context_bundle.transcript:
         # Assuming we can get the agent name or just use the agent_id if not available
         # In the context bundle, transcript is just a list of Argument objects.
         # We need a way to distinguish speakers.
-        transcript_text += f"---\nSpeaker {arg.agent_id} (Round {arg.round_index}, Turn {arg.turn_index}):\n{arg.content}\n"
+        speaker = getattr(arg, "agent_name", None) or arg.agent_id
+        transcript_text += f"---\nSpeaker {speaker} (Round {arg.round_index}, Turn {arg.turn_index}):\n{arg.content}\n"
 
     if not transcript_text:
         transcript_text = "No arguments were presented."
