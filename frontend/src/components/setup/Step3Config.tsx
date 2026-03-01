@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { useSessionStore } from '@/store/sessionStore';
+import { api } from '@/../lib/api';
 
 interface Step3ConfigProps {
   onBack: () => void;
@@ -10,6 +12,33 @@ interface Step3ConfigProps {
 
 export function Step3Config({ onBack, onSubmit, isSubmitting }: Step3ConfigProps) {
   const { wizard, setWizardConfig } = useSessionStore();
+  const [templateName, setTemplateName] = useState('');
+  const [templateDescription, setTemplateDescription] = useState('');
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [templateSaved, setTemplateSaved] = useState(false);
+  const [templateSaveError, setTemplateSaveError] = useState<string | null>(null);
+
+  const handleSaveTemplate = async () => {
+    if (!templateName.trim()) return;
+    setIsSavingTemplate(true);
+    setTemplateSaveError(null);
+    try {
+      await api.createTemplate({
+        name: templateName.trim(),
+        description: templateDescription.trim() || undefined,
+        agents: wizard.agents,
+        config: wizard.config,
+      });
+      setTemplateSaved(true);
+      setTemplateName('');
+      setTemplateDescription('');
+      setTimeout(() => setTemplateSaved(false), 2000);
+    } catch (err) {
+      setTemplateSaveError(err instanceof Error ? err.message : 'Failed to save template');
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
   const { config } = wizard;
 
   const setPriorityWeight = (key: 'recency' | 'novelty' | 'role', value: number) => {
@@ -132,6 +161,50 @@ export function Step3Config({ onBack, onSubmit, isSubmitting }: Step3ConfigProps
               }`}
             />
           </button>
+        </div>
+      </div>
+
+      {/* Save as template */}
+      <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 p-4 space-y-3">
+        <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Save as template</p>
+        <div className="space-y-2">
+          <input
+            type="text"
+            placeholder="Template name (required)"
+            value={templateName}
+            onChange={(e) => setTemplateName(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white transition"
+            aria-label="Template name"
+          />
+          <textarea
+            placeholder="Description (optional)"
+            value={templateDescription}
+            onChange={(e) => setTemplateDescription(e.target.value)}
+            rows={2}
+            className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white transition resize-none"
+            aria-label="Template description"
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleSaveTemplate}
+            disabled={!templateName.trim() || isSavingTemplate}
+            className="px-4 py-1.5 rounded-lg bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-sm font-medium hover:bg-zinc-300 dark:hover:bg-zinc-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+            aria-label="Save session config as template"
+          >
+            {isSavingTemplate ? 'Saving...' : 'Save template'}
+          </button>
+          {templateSaved && (
+            <span className="text-sm text-emerald-600 dark:text-emerald-400" role="status">
+              Template saved!
+            </span>
+          )}
+          {templateSaveError && (
+            <span className="text-sm text-red-600 dark:text-red-400" role="alert">
+              {templateSaveError}
+            </span>
+          )}
         </div>
       </div>
 

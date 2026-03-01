@@ -38,6 +38,7 @@ const selectThoughtInspectorEnabled = (s: SessionStoreState) => s.thoughtInspect
 const selectSetAgentThoughts = (s: SessionStoreState) => s.setAgentThoughts;
 const selectErrors = (s: SessionStoreState) => s.errors;
 const selectClearError = (s: SessionStoreState) => s.clearError;
+const selectLoadWizardFromTemplate = (s: SessionStoreState) => s.loadWizardFromTemplate;
 
 // ---------------------------------------------------------------------------
 // Completed session loader — fetches transcript + summary outside of the store
@@ -138,6 +139,7 @@ function LiveSessionInner({ sessionId, initialSession }: LiveSessionInnerProps) 
   const setAgentThoughts = useSessionStore(selectSetAgentThoughts);
   const errors = useSessionStore(selectErrors);
   const clearError = useSessionStore(selectClearError);
+  const loadWizardFromTemplate = useSessionStore(selectLoadWizardFromTemplate);
 
   const { isConnected, connectionError } = useWebSocket(sessionId);
 
@@ -250,6 +252,26 @@ function LiveSessionInner({ sessionId, initialSession }: LiveSessionInnerProps) 
     }
   }, [sessionId, router]);
 
+  const handleReuseConfig = useCallback(() => {
+    if (!session) return;
+    loadWizardFromTemplate({
+      id: '',
+      name: session.topic,
+      agents: session.agents.map((a) => ({
+        display_name: a.display_name,
+        persona_description: a.persona_description,
+        expertise: a.expertise,
+        llm_provider: a.llm_provider,
+        llm_model: a.llm_model,
+        llm_config: a.llm_config,
+        role: a.role,
+      })),
+      config: session.config,
+      created_at: session.created_at,
+    });
+    router.push('/sessions/new');
+  }, [session, loadWizardFromTemplate, router]);
+
   if (!session && !loadError) {
     return (
       <main className="min-h-screen bg-slate-50 px-6 py-10 text-slate-900">
@@ -333,6 +355,14 @@ function LiveSessionInner({ sessionId, initialSession }: LiveSessionInnerProps) 
               </button>
             )}
             <div className="flex-1" />
+            <button
+              type="button"
+              onClick={handleReuseConfig}
+              className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-800 hover:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+              aria-label="Reuse this session's agent configuration in a new session"
+            >
+              Reuse Config
+            </button>
             <Link
               href="/sessions/new"
               className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-800 hover:bg-slate-200"

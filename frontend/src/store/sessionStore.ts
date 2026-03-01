@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Session, SessionConfig, TerminationReason } from 'shared/types/session';
+import { Session, SessionConfig, SessionTemplate, TerminationReason } from 'shared/types/session';
 import { Agent, AgentRole, QueueEntry } from 'shared/types/agent';
 import { SessionResponse } from 'shared/types/api';
 import { RoundTableEvent } from 'shared/types/events';
@@ -192,6 +192,7 @@ export interface SessionStoreState {
   removeWizardAgent: (index: number) => void;
   setWizardConfig: (config: Partial<SessionConfig>) => void;
   resetWizard: () => void;
+  loadWizardFromTemplate: (template: SessionTemplate) => void;
 }
 
 export const useSessionStore = create<SessionStoreState>((set) => ({
@@ -483,4 +484,16 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
         },
       },
     }),
+
+  loadWizardFromTemplate: (template) =>
+    set((state) => ({
+      wizard: {
+        ...state.wizard,
+        step: 1,
+        topic: '',
+        supporting_context: '',
+        agents: template.agents,
+        config: template.config,
+      },
+    })),
 }));

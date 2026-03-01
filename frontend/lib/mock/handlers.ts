@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { Agent, AgentPreset } from 'shared/types/agent';
-import { CreatePresetRequest } from 'shared/types/api';
+import { CreatePresetRequest, SaveAsTemplateRequest } from 'shared/types/api';
+import { SessionTemplate } from 'shared/types/session';
 
 // ---------------------------------------------------------------------------
 // Fixture data (used by SPEC-101-FE session list + detail pages)
@@ -247,6 +248,24 @@ const MOCK_PRESETS: AgentPreset[] = [
 // In-memory list for user-created presets (POST/DELETE)
 let mockUserPresets: AgentPreset[] = [];
 
+// In-memory mock templates
+let mockTemplates: SessionTemplate[] = [
+  {
+    id: 'tmpl_mock_001',
+    name: 'Startup Board',
+    description: 'A 5-person startup board for product decisions',
+    agents: [
+      { display_name: 'Moderator', role: 'moderator', persona_description: 'A neutral facilitator who steers the discussion.', expertise: 'Facilitation', llm_provider: 'anthropic', llm_model: 'claude-sonnet-4-6' },
+      { display_name: 'Scribe', role: 'scribe', persona_description: 'Impartial note-taker who captures key points.', expertise: 'Summarisation', llm_provider: 'anthropic', llm_model: 'claude-haiku-4-5' },
+      { display_name: 'CEO', role: 'participant', persona_description: 'Strategic leader', expertise: 'Corporate strategy', llm_provider: 'anthropic', llm_model: 'claude-sonnet-4-6' },
+      { display_name: 'CTO', role: 'participant', persona_description: 'Technology architect', expertise: 'Software architecture', llm_provider: 'anthropic', llm_model: 'claude-sonnet-4-6' },
+      { display_name: 'Investor/VC', role: 'participant', persona_description: 'Evaluates market opportunity', expertise: 'Venture capital', llm_provider: 'openai', llm_model: 'gpt-5-mini' },
+    ],
+    config: { max_rounds: 10, convergence_majority: 0.6, priority_weights: { recency: 0.4, novelty: 0.4, role: 0.2 }, thought_inspector_enabled: false },
+    created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
+  },
+];
+
 // ---------------------------------------------------------------------------
 // buildMockAgents — used by SPEC-105 live session UI for ad-hoc sessions
 // ---------------------------------------------------------------------------
@@ -356,6 +375,74 @@ export const handlers = [
   http.post('/sessions/:id/start', () =>
     HttpResponse.json({ session_id: 'sess_mock_001', status: 'running' }, { status: 202 })
   ),
+
+  http.get('/sessions/templates', () =>
+    HttpResponse.json({ templates: mockTemplates })
+  ),
+
+  http.post('/sessions/templates', async ({ request }) => {
+    const body = await request.json() as Record<string, unknown>;
+    const newTemplate: SessionTemplate = {
+      id: `tmpl_${Date.now()}`,
+      name: (body.name as string) ?? 'Untitled Template',
+      description: body.description as string | undefined,
+      agents: (body.agents as SessionTemplate['agents']) ?? [],
+      config: (body.config as SessionTemplate['config']) ?? {
+        max_rounds: 10,
+        convergence_majority: 0.6,
+        priority_weights: { recency: 0.4, novelty: 0.4, role: 0.2 },
+        thought_inspector_enabled: false,
+      },
+      created_at: new Date().toISOString(),
+    };
+    mockTemplates = [...mockTemplates, newTemplate];
+    return HttpResponse.json(newTemplate, { status: 201 });
+  }),
+
+  http.delete('/sessions/templates/:id', ({ params }) => {
+    const id = String(params.id);
+    const exists = mockTemplates.find((t) => t.id === id);
+    if (!exists) {
+      return HttpResponse.json({ detail: 'Template not found.' }, { status: 404 });
+    }
+    mockTemplates = mockTemplates.filter((t) => t.id !== id);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.post('/sessions/:id/save-as-template', async ({ params, request }) => {
+    const sessionId = String(params.id);
+    const body = await request.json() as SaveAsTemplateRequest;
+    const fixture = MOCK_SESSIONS.find((s) => s.id === sessionId);
+    const fixtureAgents = MOCK_AGENTS.filter((a) => a.session_id === sessionId);
+
+    const sourceConfig = fixture?.config ?? {
+      max_rounds: 10,
+      convergence_majority: 0.6,
+      priority_weights: { recency: 0.4, novelty: 0.4, role: 0.2 },
+      thought_inspector_enabled: false,
+    };
+
+    const templateAgents: SessionTemplate['agents'] = fixtureAgents.map((a) => ({
+      display_name: a.display_name,
+      persona_description: a.persona_description,
+      expertise: a.expertise,
+      llm_provider: a.llm_provider,
+      llm_model: a.llm_model,
+      llm_config: a.llm_config,
+      role: a.role,
+    }));
+
+    const newTemplate: SessionTemplate = {
+      id: `tmpl_${Date.now()}`,
+      name: body.name,
+      description: body.description,
+      agents: templateAgents,
+      config: sourceConfig,
+      created_at: new Date().toISOString(),
+    };
+    mockTemplates = [...mockTemplates, newTemplate];
+    return HttpResponse.json(newTemplate, { status: 201 });
+  }),
 
   http.get('/sessions/:id', ({ params }) => {
     const id = String(params.id);

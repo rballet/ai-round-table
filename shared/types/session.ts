@@ -26,3 +26,12 @@ export interface Session {
   rounds_elapsed?: number;
   agent_count?: number;
 }
+
+export interface SessionTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  agents: Omit<import('./agent').Agent, 'id' | 'session_id'>[];
+  config: SessionConfig;
+  created_at: string;
+}

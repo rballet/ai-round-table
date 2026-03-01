@@ -413,7 +413,7 @@ Post-Phase-3 improvements that are not tied to a specific release phase. Each is
 ### SPEC-401 · Categorised Persona Library
 
 **Track:** Backend + Frontend
-**Status:** Planned
+**Status:** Complete
 
 #### Rationale
 
@@ -434,27 +434,27 @@ The default moderator and scribe remain universal (not categorised) since they a
 
 #### Backend
 
-- [ ] Add `AgentPreset` ORM model (`backend/models/agent_preset.py`) with columns: `id` (UUID PK), `display_name`, `persona_description`, `expertise`, `suggested_model`, `llm_provider`, `category`, `is_system` (bool)
-- [ ] Alembic migration for the new table
-- [ ] Seed function: on startup, insert system presets if the table is empty (idempotent)
-- [ ] `GET /agents/presets` — query DB, return all rows ordered by `is_system DESC, display_name ASC`
-- [ ] `POST /agents/presets` — validate + insert user preset (`is_system=False`), return `201` with created record
-- [ ] `DELETE /agents/presets/{id}` — delete user preset; return `403` if `is_system=True`
-- [ ] Unit tests for preset service (seed idempotency, CRUD, system-preset guard)
+- [x] Add `AgentPreset` ORM model (`backend/models/agent_preset.py`) with columns: `id` (UUID PK), `display_name`, `persona_description`, `expertise`, `suggested_model`, `llm_provider`, `category`, `is_system` (bool)
+- [x] Alembic migration for the new table
+- [x] Seed function: on startup, insert system presets if the table is empty (idempotent)
+- [x] `GET /agents/presets` — query DB, return all rows ordered by `is_system DESC, display_name ASC`
+- [x] `POST /agents/presets` — validate + insert user preset (`is_system=False`), return `201` with created record
+- [x] `DELETE /agents/presets/{id}` — delete user preset; return `403` if `is_system=True`
+- [x] Unit tests for preset service (seed idempotency, CRUD, system-preset guard)
 
 #### Shared Types
 
-- [ ] Add `category: string` and `is_system: boolean` to `AgentPreset` in `shared/types/agent.ts`
-- [ ] Add `CreatePresetRequest` interface to `shared/types/api.ts`
-- [ ] Mirror both changes in `backend/schemas/agent.py` and `backend/schemas/api.py`
+- [x] Add `category: string` and `is_system: boolean` to `AgentPreset` in `shared/types/agent.ts`
+- [x] Add `CreatePresetRequest` interface to `shared/types/api.ts`
+- [x] Mirror both changes in `backend/schemas/agent.py` and `backend/schemas/api.py`
 
 #### Frontend
 
-- [ ] Category filter pills above the preset list — `General | Business | Science & Research | Policy | Engineering | Creative` — defaulting to `General`
-- [ ] User-created presets show a `×` delete button; system presets do not
-- [ ] "Save as preset" icon button on each configured agent card in the lineup — opens an inline form (name + category picker), then `POST /agents/presets`
-- [ ] Optimistic removal on delete with error rollback
-- [ ] MSW handlers updated: `POST /agents/presets` (201), `DELETE /agents/presets/{id}` (204 / 403 for system)
+- [x] Category filter pills above the preset list — `General | Business | Science & Research | Policy | Engineering | Creative` — defaulting to `General`
+- [x] User-created presets show a `×` delete button; system presets do not
+- [x] "Save as preset" icon button on each configured agent card in the lineup — opens an inline form (name + category picker), then `POST /agents/presets`
+- [x] Optimistic removal on delete with error rollback
+- [x] MSW handlers updated: `POST /agents/presets` (201), `DELETE /agents/presets/{id}` (204 / 403 for system)
 
 #### Initial Category Set
 
@@ -476,7 +476,7 @@ The default moderator and scribe remain universal (not categorised) since they a
 ### SPEC-402 · Session Templates
 
 **Track:** Backend + Frontend
-**Status:** Planned
+**Status:** Complete
 
 #### Rationale
 
@@ -497,29 +497,29 @@ This spec introduces two complementary flows:
 
 #### Backend
 
-- [ ] Add `SessionTemplate` ORM model (`backend/models/session_template.py`) with columns: `id` (UUID PK), `name` (str), `description` (str, nullable), `agents` (JSON), `config` (JSON), `created_at` (datetime)
-- [ ] Alembic migration for the new table
-- [ ] `GET /sessions/templates` — return all templates ordered `created_at DESC`
-- [ ] `POST /sessions/templates` — validate `CreateTemplateRequest`, insert, return `201` with created record
-- [ ] `DELETE /sessions/templates/{id}` — delete; return `204` on success, `404` if not found
-- [ ] `POST /sessions/{id}/save-as-template` — reads session agents + config, accepts `name` + optional `description` in body, inserts template, returns `201`; return `404` if session not found
-- [ ] Unit tests for template service (list, create, delete, save-as-template from session)
+- [x] Add `SessionTemplate` ORM model (`backend/models/session_template.py`) with columns: `id` (UUID PK), `name` (str), `description` (str, nullable), `agents` (JSON), `config` (JSON), `created_at` (datetime)
+- [x] Alembic migration for the new table
+- [x] `GET /sessions/templates` — return all templates ordered `created_at DESC`
+- [x] `POST /sessions/templates` — validate `CreateTemplateRequest`, insert, return `201` with created record
+- [x] `DELETE /sessions/templates/{id}` — delete; return `204` on success, `404` if not found
+- [x] `POST /sessions/{id}/save-as-template` — reads session agents + config, accepts `name` + optional `description` in body, inserts template, returns `201`; return `404` if session not found
+- [x] Unit tests for template service (list, create, delete, save-as-template from session)
 
 #### Shared Types
 
-- [ ] Add `SessionTemplate` interface to `shared/types/session.ts`: `id`, `name`, `description?`, `agents` (`Omit<Agent, 'id' | 'session_id'>[]`), `config: SessionConfig`, `created_at`
-- [ ] Add `CreateTemplateRequest` interface to `shared/types/api.ts`: `name`, `description?`, `agents`, `config`
-- [ ] Add `TemplatesResponse` interface to `shared/types/api.ts`: `templates: SessionTemplate[]`
-- [ ] Mirror all changes in `backend/schemas/session.py` and `backend/schemas/api.py`
+- [x] Add `SessionTemplate` interface to `shared/types/session.ts`: `id`, `name`, `description?`, `agents` (`Omit<Agent, 'id' | 'session_id'>[]`), `config: SessionConfig`, `created_at`
+- [x] Add `CreateTemplateRequest` interface to `shared/types/api.ts`: `name`, `description?`, `agents`, `config`
+- [x] Add `TemplatesResponse` interface to `shared/types/api.ts`: `templates: SessionTemplate[]`
+- [x] Mirror all changes in `backend/schemas/session.py` and `backend/schemas/api.py`
 
 #### Frontend
 
-- [ ] **Template picker** on the new session page (`/sessions/new`) — a collapsible panel or dropdown above step 1 showing saved templates (name, agent count, created date); clicking a template pre-fills steps 2 and 3 and collapses the picker
-- [ ] **"Save as template" button** on step 3 (config step) — opens an inline form (name field + optional description), submits `POST /sessions/templates`, shows success confirmation
-- [ ] **"Reuse config" button** on each session card in the session list (`/`) and on the session detail page (`/sessions/{id}`) — calls `POST /sessions/{id}/save-as-template` (or fetches session data client-side), then navigates to `/sessions/new` with the template pre-loaded into the wizard state
-- [ ] **Delete button** on each template in the picker — calls `DELETE /sessions/templates/{id}` with optimistic removal and error rollback
-- [ ] `api.ts`: add `getTemplates`, `createTemplate`, `deleteTemplate`, `saveSessionAsTemplate` methods
-- [ ] MSW handlers updated: `GET /sessions/templates` (200), `POST /sessions/templates` (201), `DELETE /sessions/templates/:id` (204/404), `POST /sessions/:id/save-as-template` (201)
+- [x] **Template picker** on the new session page (`/sessions/new`) — a collapsible panel or dropdown above step 1 showing saved templates (name, agent count, created date); clicking a template pre-fills steps 2 and 3 and collapses the picker
+- [x] **"Save as template" button** on step 3 (config step) — opens an inline form (name field + optional description), submits `POST /sessions/templates`, shows success confirmation
+- [x] **"Reuse config" button** on each session card in the session list (`/`) and on the session detail page (`/sessions/{id}`) — calls `POST /sessions/{id}/save-as-template` (or fetches session data client-side), then navigates to `/sessions/new` with the template pre-loaded into the wizard state
+- [x] **Delete button** on each template in the picker — calls `DELETE /sessions/templates/{id}` with optimistic removal and error rollback
+- [x] `api.ts`: add `getTemplates`, `createTemplate`, `deleteTemplate`, `saveSessionAsTemplate` methods
+- [x] MSW handlers updated: `GET /sessions/templates` (200), `POST /sessions/templates` (201), `DELETE /sessions/templates/:id` (204/404), `POST /sessions/:id/save-as-template` (201)
 
 #### Template Picker Wire Frame
 

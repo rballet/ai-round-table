@@ -13,8 +13,10 @@ services:
       # Override DATABASE_URL to use the Docker volume path instead of the local default.
       - DATABASE_URL=sqlite+aiosqlite:///./data/ai_round_table.db
       - LLM_TIMEOUT_SECONDS=${LLM_TIMEOUT_SECONDS:-120}
+      - LOG_DIR=/app/logs
     volumes:
       - backend_data:/app/data
+      - ./logs:/app/logs
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\""]
       interval: 10s

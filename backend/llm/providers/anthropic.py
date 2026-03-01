@@ -50,13 +50,25 @@ class AnthropicProvider(BaseLLMProvider):
                 "Anthropic completion requires at least one user/assistant message."
             )
 
+        # Anthropic's API requires a max_tokens value, but we don't want to
+        # impose a low, hard-coded cap. Allow per-call overrides via config,
+        # and otherwise fall back to a generous default.
+        effective_config = config or {}
+        if "max_tokens" in effective_config and effective_config["max_tokens"] is not None:
+            max_tokens = effective_config["max_tokens"]
+        else:
+            max_tokens = 4096
+
+        # Exclude max_tokens from the config when merging so the explicit
+        # value above always wins.
+        merged_config = {k: v for k, v in effective_config.items() if k != "max_tokens" and v is not None}
+
         payload: dict[str, Any] = {
             "model": model,
             "messages": anthropic_messages,
-            "max_tokens": 1024,
+            "max_tokens": max_tokens,
+            **merged_config,
         }
-        if config:
-            payload.update({k: v for k, v in config.items() if v is not None})
         if system_prompt:
             payload["system"] = system_prompt
 

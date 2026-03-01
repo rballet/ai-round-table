@@ -8,9 +8,13 @@ import {
     QueueResponse,
     SummaryResponse,
     PresetsResponse,
-    CreatePresetRequest
+    CreatePresetRequest,
+    CreateTemplateRequest,
+    TemplatesResponse,
+    SaveAsTemplateRequest,
 } from 'shared/types/api';
 import { AgentPreset } from 'shared/types/agent';
+import { SessionTemplate } from 'shared/types/session';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -61,4 +65,8 @@ export const api = {
     createPreset: (data: CreatePresetRequest) => fetchApi<AgentPreset>('/agents/presets', { method: 'POST', body: JSON.stringify(data) }),
     deletePreset: (id: string) => fetchApi<void>(`/agents/presets/${id}`, { method: 'DELETE' }),
     getSessions: () => fetchApi<SessionsListResponse>('/sessions'),
+    getTemplates: () => fetchApi<TemplatesResponse>('/sessions/templates'),
+    createTemplate: (data: CreateTemplateRequest) => fetchApi<SessionTemplate>('/sessions/templates', { method: 'POST', body: JSON.stringify(data) }),
+    deleteTemplate: (id: string) => fetchApi<void>(`/sessions/templates/${id}`, { method: 'DELETE' }),
+    saveSessionAsTemplate: (sessionId: string, data: SaveAsTemplateRequest) => fetchApi<SessionTemplate>(`/sessions/${sessionId}/save-as-template`, { method: 'POST', body: JSON.stringify(data) }),
 };

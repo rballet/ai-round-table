@@ -2,10 +2,12 @@
 
 import { useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import type { SessionResponse } from 'shared/types/api';
 import type { TranscriptResponse, SummaryResponse } from 'shared/types/api';
 import type { Agent } from 'shared/types/agent';
+import { useSessionStore } from '@/store/sessionStore';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -256,6 +258,27 @@ export function CompletedSessionView({
   onDelete,
 }: CompletedSessionViewProps) {
   const reason = session.termination_reason;
+  const router = useRouter();
+  const loadWizardFromTemplate = useSessionStore((s) => s.loadWizardFromTemplate);
+
+  const handleReuseConfig = useCallback(() => {
+    loadWizardFromTemplate({
+      id: '',
+      name: session.topic,
+      agents: session.agents.map((a) => ({
+        display_name: a.display_name,
+        persona_description: a.persona_description,
+        expertise: a.expertise,
+        llm_provider: a.llm_provider,
+        llm_model: a.llm_model,
+        llm_config: a.llm_config,
+        role: a.role,
+      })),
+      config: session.config,
+      created_at: session.created_at,
+    });
+    router.push('/sessions/new');
+  }, [session, loadWizardFromTemplate, router]);
 
   const handleDownload = useCallback(() => {
     const markdown = buildMarkdown(session, transcript, summary);
@@ -336,6 +359,14 @@ export function CompletedSessionView({
 
             {/* Action buttons */}
             <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleReuseConfig}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+                aria-label="Reuse agent configuration from this session"
+              >
+                Reuse Config
+              </button>
               <button
                 type="button"
                 onClick={handleDownload}

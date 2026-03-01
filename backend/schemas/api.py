@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
-from .session import SessionSchema, SessionConfigSchema
+from .session import SessionSchema, SessionConfigSchema, SessionTemplateSchema
 from .agent import AgentSchema, AgentPresetSchema, QueueEntrySchema
 
 class CreateSessionRequestSchema(BaseModel):
@@ -76,3 +76,16 @@ class ErrorEventSchema(BaseModel):
 class ErrorsResponseSchema(BaseModel):
     session_id: str
     errors: List[ErrorEventSchema]
+
+class CreateTemplateRequestSchema(BaseModel):
+    name: str
+    description: Optional[str] = None
+    agents: List[Dict[str, Any]]
+    config: SessionConfigSchema
+
+class TemplatesResponseSchema(BaseModel):
+    templates: List[SessionTemplateSchema]
+
+class SaveAsTemplateRequestSchema(BaseModel):
+    name: str
+    description: Optional[str] = None

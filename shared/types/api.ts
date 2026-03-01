@@ -1,4 +1,4 @@
-import { Session, SessionConfig } from './session';
+import { Session, SessionConfig, SessionTemplate } from './session';
 import { Agent, AgentPreset, QueueEntry } from './agent';
 
 // API Requests
@@ -71,4 +71,20 @@ export interface CreatePresetRequest {
     suggested_model: string;
     llm_provider: string;
     category: string;
+}
+
+export interface CreateTemplateRequest {
+    name: string;
+    description?: string;
+    agents: Omit<Agent, 'id' | 'session_id'>[];
+    config: SessionConfig;
+}
+
+export interface TemplatesResponse {
+    templates: SessionTemplate[];
+}
+
+export interface SaveAsTemplateRequest {
+    name: string;
+    description?: string;
 }

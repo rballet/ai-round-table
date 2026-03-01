@@ -5,6 +5,7 @@
       "name": "frontend",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--workspace=frontend", "--", "--port", "3003"],
+      "env": { "NEXT_PUBLIC_USE_MOCK": "true" },
       "port": 3003
     }
   ]

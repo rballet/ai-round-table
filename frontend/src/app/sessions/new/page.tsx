@@ -10,7 +10,9 @@ import { StepIndicator } from '@/components/ui/StepIndicator';
 import { Step1Topic } from '@/components/setup/Step1Topic';
 import { Step2Agents } from '@/components/setup/Step2Agents';
 import { Step3Config } from '@/components/setup/Step3Config';
+import { TemplatePicker } from '@/components/setup/TemplatePicker';
 import { CreateSessionRequest } from 'shared/types/api';
+import type { SessionTemplate } from 'shared/types/session';
 
 const STEPS = [
   { label: 'Topic & Context' },
@@ -35,14 +37,24 @@ const slideVariants = {
 
 export default function NewSessionPage() {
   const router = useRouter();
-  const { wizard, setWizardStep, resetWizard } = useSessionStore();
+  const { wizard, setWizardStep, resetWizard, loadWizardFromTemplate } = useSessionStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [direction, setDirection] = useState(1);
+  const [templatePickerCollapsed, setTemplatePickerCollapsed] = useState(false);
 
   const goToStep = (next: 1 | 2 | 3) => {
     setDirection(next > wizard.step ? 1 : -1);
     setWizardStep(next);
+  };
+
+  const handleTemplateSelect = (template: SessionTemplate) => {
+    loadWizardFromTemplate(template);
+    setTemplatePickerCollapsed(true);
+    setDirection(1);
+    // Stay on step 1 so the user sets the topic before proceeding.
+    // loadWizardFromTemplate already sets step to 1 and clears topic/context.
+    setWizardStep(1);
   };
 
   const handleSubmit = async () => {
@@ -84,6 +96,9 @@ export default function NewSessionPage() {
             <span className="text-zinc-900 dark:text-white font-medium">New Session</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight">New Session</h1>
+          {!templatePickerCollapsed && (
+            <TemplatePicker onSelect={handleTemplateSelect} />
+          )}
           <StepIndicator currentStep={wizard.step} steps={STEPS} />
         </header>
 

@@ -18,9 +18,12 @@ from schemas.api import (
     QueueResponseSchema,
     SummaryResponseSchema,
     ErrorsResponseSchema,
+    CreateTemplateRequestSchema,
+    TemplatesResponseSchema,
+    SaveAsTemplateRequestSchema,
 )
-from schemas.session import SessionSchema
-from services import error_service, session_service
+from schemas.session import SessionSchema, SessionTemplateSchema
+from services import error_service, session_service, template_service
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -93,6 +96,70 @@ async def list_sessions(
     return SessionsListResponseSchema(
         sessions=[_serialize_session(s) for s in sessions]
     )
+
+
+def _serialize_template(template) -> SessionTemplateSchema:
+    created_at_str = (
+        template.created_at.isoformat()
+        if hasattr(template.created_at, "isoformat")
+        else str(template.created_at)
+    )
+    return SessionTemplateSchema(
+        id=template.id,
+        name=template.name,
+        description=template.description,
+        agents=template.agents,
+        config=template.config,
+        created_at=created_at_str,
+    )
+
+
+@router.get("/templates", response_model=TemplatesResponseSchema)
+async def list_templates(
+    db: AsyncSession = Depends(get_db),
+) -> TemplatesResponseSchema:
+    templates = await template_service.list_templates(db)
+    return TemplatesResponseSchema(
+        templates=[_serialize_template(t) for t in templates]
+    )
+
+
+@router.post("/templates", status_code=201, response_model=SessionTemplateSchema)
+async def create_template(
+    request: CreateTemplateRequestSchema,
+    db: AsyncSession = Depends(get_db),
+) -> SessionTemplateSchema:
+    template = await template_service.create_template(db, request)
+    return _serialize_template(template)
+
+
+@router.delete("/templates/{template_id}", status_code=204)
+async def delete_template(
+    template_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    deleted = await template_service.delete_template(db, template_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return Response(status_code=204)
+
+
+@router.post(
+    "/{session_id}/save-as-template",
+    status_code=201,
+    response_model=SessionTemplateSchema,
+)
+async def save_session_as_template(
+    session_id: str,
+    request: SaveAsTemplateRequestSchema,
+    db: AsyncSession = Depends(get_db),
+) -> SessionTemplateSchema:
+    template = await template_service.save_session_as_template(
+        db, session_id, request.name, request.description
+    )
+    if template is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return _serialize_template(template)
 
 
 @router.get("/{session_id}", response_model=SessionResponseSchema)

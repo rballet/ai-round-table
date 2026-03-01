@@ -8,6 +8,7 @@ from .moderator_state import ModeratorState
 from .summary import Summary
 from .error_event import ErrorEvent
 from .agent_preset import AgentPreset
+from .session_template import SessionTemplate
 
 __all__ = [
     "Base",
@@ -20,4 +21,5 @@ __all__ = [
     "Summary",
     "ErrorEvent",
     "AgentPreset",
+    "SessionTemplate",
 ]
