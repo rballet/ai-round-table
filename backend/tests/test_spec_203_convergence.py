@@ -149,4 +149,4 @@ async def test_convergence_early_termination(db: AsyncSession):
 
     session_end_events = [e for e in events if e["type"] == "SESSION_END"]
     assert len(session_end_events) == 1
-    assert session_end_events[0]["termination_reason"] == "consensus"
+    assert session_end_events[0]["reason"] == "consensus"

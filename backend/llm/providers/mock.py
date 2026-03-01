@@ -125,10 +125,27 @@ class MockProvider(BaseLLMProvider):
         })
         
     def _moderator_response(self, messages: list[Message]) -> str:
-        # Simulating open status, until end of test maybe? 
-        # Capped termination can happen, but let's just make it 'open' to avoid early termination, letting the Cap rule handle termination.
+        # Simulate convergence if the discussion has gone on for a few turns
+        # The moderator always receives exactly 2 messages (system + user), 
+        # so we check the character length of the content payload which grows 
+        # as the transcript gets longer.
+        total_content_len = sum(
+            len(msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", ""))
+            for msg in messages
+        )
+        print(f"[MOCK_DEBUG] Moderator prompt content len: {total_content_len}")
+        
+        # A typical starting prompt with 1 round of arguments is around 2000-3000 chars.
+        # We can simulate convergence once it gets decently long.
+        if total_content_len > 4000:
+            return json.dumps({
+                "status": "converging",
+                "novel_claims_this_round": 0,
+                "justification": "The group has reached a consensus as simulated by the mock provider."
+            })
+            
         return json.dumps({
             "status": "open",
             "novel_claims_this_round": 1,
-            "justification": "Mock ongoing discussion"
+            "justification": "Mock ongoing discussion. Not enough history to converge yet."
         })
