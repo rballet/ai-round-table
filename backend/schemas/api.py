@@ -60,7 +60,7 @@ class PresetsResponseSchema(BaseModel):
 class ErrorEventSchema(BaseModel):
     id: str
     session_id: str
-    agent_id: Optional[str]
+    agent_id: Optional[str] = None
     code: str
     message: str
     created_at: str
