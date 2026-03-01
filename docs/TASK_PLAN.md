@@ -318,14 +318,14 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 ### Phase 2 Integration
 
-- [ ] Full end-to-end run: create session → start → watch full discussion → see summary
-- [ ] Test pause/resume mid-session
-- [ ] Test force-end before convergence
-- [ ] Verify cap termination produces a correctly labelled summary
-- [ ] Update frontend to listen to `CONVERGENCE_CHECK` WS event and update progress bar
-- [ ] Add a button to return to the session creation page from a specific session
-- [ ] Add an option to delete a given session
-- [ ] Fix priority queue implementation to correctly remove old requests
+- [x] Full end-to-end run: create session → start → watch full discussion → see summary
+- [x] Test pause/resume mid-session
+- [x] Test force-end before convergence
+- [x] Verify cap termination produces a correctly labelled summary
+- [x] Update frontend to listen to `CONVERGENCE_CHECK` WS event and update progress bar
+- [x] Add a button to return to the session creation page from a specific session
+- [x] Add an option to delete a given session
+- [x] Fix priority queue implementation to correctly remove old requests
 
 ---
 

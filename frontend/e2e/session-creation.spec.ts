@@ -543,4 +543,23 @@ test.describe('Session detail page', () => {
     await expect(page.getByText('ended').first()).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('summary-panel')).toBeVisible({ timeout: 15000 });
   });
+
+  test('allows forcing the session to end before convergence', async ({ page }) => {
+    await page.goto('/sessions/sess_mock_spec204');
+
+    await page.waitForSelector('h1', { timeout: 10000 });
+
+    // Wait until it is running so the button is visible
+    const forceEndButton = page.getByRole('button', { name: 'Force End' });
+    await expect(forceEndButton).toBeVisible({ timeout: 10000 });
+
+    // Click force end
+    await forceEndButton.click();
+
+    // Verify it ends
+    await expect(page.getByText('ended').first()).toBeVisible({ timeout: 10000 });
+    const summaryPanel = page.getByTestId('summary-panel');
+    await expect(summaryPanel).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('termination-reason-badge')).toContainText('Host');
+  });
 });

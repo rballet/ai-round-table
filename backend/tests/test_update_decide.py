@@ -576,9 +576,9 @@ async def test_orchestrator_broadcasts_update_start_and_end(db: AsyncSession):
 
     event_types = broadcaster.event_types()
     # There are 2 participants; 1 argues; 1 non-active participant should get update events.
-    # Expecting 3 UPDATE_START/ENDs for 3 turns.
-    assert event_types.count("UPDATE_START") == 3
-    assert event_types.count("UPDATE_END") == 3
+    # Queue deduplication means the session runs for exactly 2 turns (each participant argues once).
+    assert event_types.count("UPDATE_START") == 2
+    assert event_types.count("UPDATE_END") == 2
 
 
 @pytest.mark.asyncio
@@ -616,7 +616,8 @@ async def test_orchestrator_update_failure_still_emits_update_end_for_failing_ag
     assert set(update_start_ids) == set(participant_ids.values())
     assert set(update_end_ids) == set(participant_ids.values())
     assert participant_ids["Bob"] in update_end_ids
-    assert broadcaster.event_types().count("ARGUMENT_POSTED") == 4
+    # Queue deduplication means 3 participants run for 3 turns (not 4).
+    assert broadcaster.event_types().count("ARGUMENT_POSTED") == 3
 
     async with session_factory() as verify_db:
         thoughts_result = await verify_db.execute(
@@ -631,8 +632,8 @@ async def test_orchestrator_update_failure_still_emits_update_end_for_failing_ag
         )
         bob_thoughts = list(bob_thoughts_result.scalars().all())
 
-    # Three initial think thoughts + 6 successful update thoughts.
-    assert len(thoughts) == 9
+    # Three initial think thoughts + 4 successful update thoughts (Bob's always fail).
+    assert len(thoughts) == 7
     assert len(bob_thoughts) == 1
 
 
@@ -671,9 +672,11 @@ async def test_orchestrator_with_three_participants_updates_and_decides_for_two_
 
     await orchestrator.run(prompt="Which architecture?")
 
-    assert provider.decide_call_count == 8
-    assert broadcaster.event_types().count("UPDATE_START") == 8
-    assert broadcaster.event_types().count("UPDATE_END") == 8
+    # Queue deduplication means 3 participants run for 3 turns (not 4).
+    # 2 non-speakers decide per turn × 3 turns = 6 decide calls.
+    assert provider.decide_call_count == 6
+    assert broadcaster.event_types().count("UPDATE_START") == 6
+    assert broadcaster.event_types().count("UPDATE_END") == 6
     assert broadcaster.event_types().count("TOKEN_REQUEST") == 1
 
     async with session_factory() as verify_db:
@@ -686,9 +689,9 @@ async def test_orchestrator_with_three_participants_updates_and_decides_for_two_
         )
         queue_entries = list(queue_entries_result.scalars().all())
 
-    # 3 think thoughts + 8 update thoughts.
-    assert len(thoughts) == 11
-    # 3 initial queue entries + 1 decide re-entry.
+    # 3 think thoughts + 6 update thoughts (2 per turn × 3 turns).
+    assert len(thoughts) == 9
+    # 3 initial queue entries + 1 decide re-entry (dedup replaces old but both are persisted).
     assert len(queue_entries) == 4
 
 
@@ -743,8 +746,8 @@ async def test_orchestrator_update_creates_new_thought_versions(db: AsyncSession
         )
         thoughts = list(result.scalars().all())
 
-    # 2 initial think thoughts + 3 update thoughts over 3 turns.
-    assert len(thoughts) == 5
+    # 2 initial think thoughts + 2 update thoughts over 2 turns.
+    assert len(thoughts) == 4
 
 
 @pytest.mark.asyncio
@@ -787,7 +790,8 @@ async def test_orchestrator_thought_updated_emitted_when_inspector_enabled(
     await orchestrator.run(prompt="Which architecture?")
 
     thought_updated_events = broadcaster.events_of_type("THOUGHT_UPDATED")
-    assert len(thought_updated_events) == 3
+    # 2 participants → 2 turns → 1 non-speaker update per turn = 2 THOUGHT_UPDATED events.
+    assert len(thought_updated_events) == 2
     # Event must carry the updated thought as a nested object with required fields.
     event = thought_updated_events[0]
     assert "thought" in event
@@ -948,9 +952,9 @@ async def test_orchestrator_no_update_events_when_single_participant(db: AsyncSe
 
     await orchestrator.run(prompt="Which architecture?")
 
-    # With 2 participants over 3 turns, exactly 3 gets UPDATE_START/END (the non-active one).
-    assert broadcaster.event_types().count("UPDATE_START") == 3
-    assert broadcaster.event_types().count("UPDATE_END") == 3
+    # With 2 participants over 2 turns, exactly 2 UPDATE_START/END events (the non-active one per turn).
+    assert broadcaster.event_types().count("UPDATE_START") == 2
+    assert broadcaster.event_types().count("UPDATE_END") == 2
 
 
 @pytest.mark.asyncio

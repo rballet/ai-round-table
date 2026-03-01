@@ -133,8 +133,7 @@ class MockProvider(BaseLLMProvider):
             len(msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", ""))
             for msg in messages
         )
-        print(f"[MOCK_DEBUG] Moderator prompt content len: {total_content_len}")
-        
+                
         # A typical starting prompt with 1 round of arguments is around 2000-3000 chars.
         # We can simulate convergence once it gets decently long.
         if total_content_len > 4000:
