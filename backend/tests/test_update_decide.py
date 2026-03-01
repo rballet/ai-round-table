@@ -790,17 +790,25 @@ async def test_orchestrator_thought_updated_emitted_when_inspector_enabled(
     await orchestrator.run(prompt="Which architecture?")
 
     thought_updated_events = broadcaster.events_of_type("THOUGHT_UPDATED")
-    # 2 participants → 2 turns → 1 non-speaker update per turn = 2 THOUGHT_UPDATED events.
-    assert len(thought_updated_events) == 2
-    # Event must carry the updated thought as a nested object with required fields.
-    event = thought_updated_events[0]
-    assert "thought" in event
-    thought_obj = event["thought"]
-    assert isinstance(thought_obj, dict)
-    assert "id" in thought_obj
-    assert "agent_id" in thought_obj
-    assert "version" in thought_obj
-    assert "Updated private position" in thought_obj["content"]
+    # With thought_inspector_enabled=True, THOUGHT_UPDATED is emitted:
+    #   - Once per participant during _phase_think  (2 agents → 2 events, version=1)
+    #   - Once per non-active participant per argue turn (2 turns × 1 update = 2 events, version>1)
+    # Total: 4 events.
+    assert len(thought_updated_events) == 4
+    # All events must carry the thought as a nested object with the required fields.
+    for event in thought_updated_events:
+        assert "thought" in event
+        thought_obj = event["thought"]
+        assert isinstance(thought_obj, dict)
+        assert "id" in thought_obj
+        assert "agent_id" in thought_obj
+        assert "version" in thought_obj
+        assert "content" in thought_obj
+    # The update-phase events (version > 1) must reference the updated thought content.
+    update_phase_events = [e for e in thought_updated_events if e["thought"]["version"] > 1]
+    assert len(update_phase_events) == 2
+    for event in update_phase_events:
+        assert "Updated private position" in event["thought"]["content"]
 
 
 @pytest.mark.asyncio

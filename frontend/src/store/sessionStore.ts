@@ -102,6 +102,13 @@ function keepHandsForQueuedAgents(
 // Combined store state
 // ---------------------------------------------------------------------------
 
+export interface AgentThought {
+  id: string;
+  agent_id: string;
+  version: number;
+  content: string;
+}
+
 export interface SessionStoreState {
   // --- Sessions list (SPEC-101-FE) ---
   sessions: Session[];
@@ -123,6 +130,8 @@ export interface SessionStoreState {
   convergenceStatus: ConvergenceRuntimeStatus;
   isConnected: boolean;
   connectionError: string | null;
+  agentThoughts: Record<string, AgentThought[]>;
+  thoughtInspectorEnabled: boolean;
 
   // --- Wizard (SPEC-101-FE) ---
   wizard: WizardState;
@@ -139,6 +148,7 @@ export interface SessionStoreState {
   openSummaryPanel: () => void;
   closeSummaryPanel: () => void;
   setSummary: (summary: LiveSummary) => void;
+  setAgentThoughts: (thoughts: AgentThought[]) => void;
 
   // --- Actions: wizard ---
   setWizardStep: (step: 1 | 2 | 3) => void;
@@ -171,6 +181,8 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
   convergenceStatus: null,
   isConnected: false,
   connectionError: null,
+  agentThoughts: {},
+  thoughtInspectorEnabled: false,
 
   // Wizard
   wizard: {
@@ -199,6 +211,8 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
       agentStatuses: toIdleStatuses(session.agents),
       raisedHands: toLoweredHands(session.agents),
       connectionError: null,
+      agentThoughts: {},
+      thoughtInspectorEnabled: session.config.thought_inspector_enabled,
     }),
 
   setConnectionState: (isConnected, error = null) =>
@@ -207,6 +221,22 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
   openSummaryPanel: () => set({ summaryPanelOpen: true }),
   closeSummaryPanel: () => set({ summaryPanelOpen: false }),
   setSummary: (summary) => set({ summary }),
+
+  setAgentThoughts: (thoughts) =>
+    set(() => {
+      const agentThoughts: Record<string, AgentThought[]> = {};
+      for (const thought of thoughts) {
+        if (!agentThoughts[thought.agent_id]) {
+          agentThoughts[thought.agent_id] = [];
+        }
+        agentThoughts[thought.agent_id].push(thought);
+      }
+      // Sort each agent's thoughts by version ascending
+      for (const agentId of Object.keys(agentThoughts)) {
+        agentThoughts[agentId].sort((a, b) => a.version - b.version);
+      }
+      return { agentThoughts };
+    }),
 
   handleEvent: (event) =>
     set((state) => {
@@ -220,6 +250,7 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
             state.agents.length === event.agents.length
               ? state.raisedHands
               : toLoweredHands(event.agents);
+          const resolvedConfig = event.config ?? state.session?.config;
           return {
             session: state.session
               ? {
@@ -233,6 +264,7 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
             agents: event.agents,
             agentStatuses,
             raisedHands,
+            thoughtInspectorEnabled: resolvedConfig?.thought_inspector_enabled ?? state.thoughtInspectorEnabled,
           };
         }
         case 'THINK_START':
@@ -303,6 +335,16 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
                 state.agentStatuses[event.agent_id] === 'active' ? 'active' : 'idle',
             },
           };
+        case 'THOUGHT_UPDATED': {
+          const { thought } = event;
+          const existing = state.agentThoughts[thought.agent_id] ?? [];
+          return {
+            agentThoughts: {
+              ...state.agentThoughts,
+              [thought.agent_id]: [...existing, thought],
+            },
+          };
+        }
         case 'CONVERGENCE_CHECK':
           return {
             convergenceStatus: event.status,

@@ -86,11 +86,17 @@ class SessionOrchestrator:
             config=config,
             agents=agents,
         )
+        thought_inspector_enabled = bool(
+            config.get("thought_inspector_enabled", False)
+            if isinstance(config, dict)
+            else False
+        )
         await self._phase_think(
             topic=topic,
             prompt=prompt,
             supporting_context=supporting_context,
             participants=participants,
+            thought_inspector_enabled=thought_inspector_enabled,
         )
         await self._phase_init_queue(
             participants=participants,
@@ -149,6 +155,7 @@ class SessionOrchestrator:
         prompt: str,
         supporting_context: str | None,
         participants: list[AgentContext],
+        thought_inspector_enabled: bool = False,
     ) -> None:
         await asyncio.gather(
             *[
@@ -157,6 +164,7 @@ class SessionOrchestrator:
                     topic=topic,
                     prompt=prompt,
                     supporting_context=supporting_context,
+                    thought_inspector_enabled=thought_inspector_enabled,
                 )
                 for agent in participants
             ]
@@ -169,6 +177,7 @@ class SessionOrchestrator:
         topic: str,
         prompt: str,
         supporting_context: str | None,
+        thought_inspector_enabled: bool = False,
     ) -> None:
         context_bundle = ContextBundle(
             topic=topic,
@@ -185,7 +194,20 @@ class SessionOrchestrator:
                 llm_client=self._llm_client,
                 broadcast_manager=self._broadcast_manager,
             )
-            await runner.think(agent, context_bundle)
+            initial_thought = await runner.think(agent, context_bundle)
+
+        if thought_inspector_enabled:
+            await self._emit_event(
+                "THOUGHT_UPDATED",
+                {
+                    "thought": {
+                        "id": initial_thought.id,
+                        "agent_id": agent.id,
+                        "version": initial_thought.version,
+                        "content": initial_thought.content,
+                    },
+                },
+            )
 
     async def _phase_init_queue(
         self,

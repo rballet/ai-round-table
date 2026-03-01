@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api } from '../../../../lib/api';
 import { RoundTable } from '@/components/table/RoundTable';
 import { QueuePanel } from '@/components/table/QueuePanel';
+import { ThoughtInspector } from '@/components/table/ThoughtInspector';
 import { ArgumentFeed } from '@/components/feed/ArgumentFeed';
 import { SummaryPanel } from '@/components/feed/SummaryPanel';
 import { SessionStatus } from '@/components/controls/SessionStatus';
@@ -29,6 +30,9 @@ const selectOpenSummaryPanel = (s: SessionStoreState) => s.openSummaryPanel;
 const selectCloseSummaryPanel = (s: SessionStoreState) => s.closeSummaryPanel;
 const selectInitializeSession = (s: SessionStoreState) => s.initializeSession;
 const selectSetSummary = (s: SessionStoreState) => s.setSummary;
+const selectAgentThoughts = (s: SessionStoreState) => s.agentThoughts;
+const selectThoughtInspectorEnabled = (s: SessionStoreState) => s.thoughtInspectorEnabled;
+const selectSetAgentThoughts = (s: SessionStoreState) => s.setAgentThoughts;
 
 export default function LiveSessionPage() {
   const params = useParams<{ id: string | string[] }>();
@@ -42,6 +46,7 @@ export default function LiveSessionPage() {
   const [startPrompt, setStartPrompt] = useState('');
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const [thoughtInspectorOpen, setThoughtInspectorOpen] = useState(true);
 
   const session = useSessionStore(selectSession);
   const agents = useSessionStore(selectAgents);
@@ -59,6 +64,9 @@ export default function LiveSessionPage() {
   const closeSummaryPanel = useSessionStore(selectCloseSummaryPanel);
   const initializeSession = useSessionStore(selectInitializeSession);
   const setSummary = useSessionStore(selectSetSummary);
+  const agentThoughts = useSessionStore(selectAgentThoughts);
+  const thoughtInspectorEnabled = useSessionStore(selectThoughtInspectorEnabled);
+  const setAgentThoughts = useSessionStore(selectSetAgentThoughts);
 
   const { isConnected, connectionError } = useWebSocket(sessionId);
 
@@ -94,6 +102,26 @@ export default function LiveSessionPage() {
               console.error('Failed to load summary for ended session:', err);
             });
         }
+
+        if (response.config.thought_inspector_enabled) {
+          api
+            .getThoughts(sessionId)
+            .then((thoughtsRes) => {
+              if (mounted && thoughtsRes.thoughts.length > 0) {
+                setAgentThoughts(
+                  thoughtsRes.thoughts.map((t) => ({
+                    id: t.id,
+                    agent_id: t.agent_id,
+                    version: t.version,
+                    content: t.content,
+                  }))
+                );
+              }
+            })
+            .catch((err) => {
+              console.error('Failed to load thoughts for session:', err);
+            });
+        }
       })
       .catch((error) => {
         if (!mounted) {
@@ -105,7 +133,7 @@ export default function LiveSessionPage() {
     return () => {
       mounted = false;
     };
-  }, [sessionId, initializeSession, setSummary]);
+  }, [sessionId, initializeSession, setSummary, setAgentThoughts]);
 
   const handleStartSession = useCallback(async () => {
     if (!sessionId) return;
@@ -323,6 +351,14 @@ export default function LiveSessionPage() {
               activeAgentId={activeAgentId}
             />
             <QueuePanel queue={queue} />
+            {thoughtInspectorEnabled && (
+              <ThoughtInspector
+                agents={agents}
+                agentThoughts={agentThoughts}
+                isOpen={thoughtInspectorOpen}
+                onToggle={() => setThoughtInspectorOpen((prev) => !prev)}
+              />
+            )}
           </section>
 
           <ArgumentFeed argumentsList={argumentsList} />

@@ -111,26 +111,36 @@ async def get_transcript(db: AsyncSession, session_id: str) -> list[Argument]:
 
 
 async def get_thoughts(
-    db: AsyncSession, session_id: str, version: int | None = None
+    db: AsyncSession,
+    session_id: str,
+    version: int | None = None,
+    agent_id: str | None = None,
 ) -> list[Thought]:
     query = select(Thought).where(Thought.session_id == session_id)
-    if version is not None:
-        query = query.where(Thought.version == version)
-    else:
-        query = query.order_by(Thought.agent_id, Thought.version.desc())
 
+    if agent_id is not None:
+        # Full history for a specific agent, ordered by version ascending.
+        query = query.where(Thought.agent_id == agent_id).order_by(Thought.version.asc())
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
+    if version is not None:
+        # All agents at a specific version snapshot.
+        query = query.where(Thought.version == version)
+        result = await db.execute(query)
+        return list(result.scalars().all())
+
+    # Default: latest thought per agent.
+    query = query.order_by(Thought.agent_id, Thought.version.desc())
     result = await db.execute(query)
     thoughts = list(result.scalars().all())
-
-    if version is None:
-        latest_thoughts = []
-        seen_agents = set()
-        for t in thoughts:
-            if t.agent_id not in seen_agents:
-                latest_thoughts.append(t)
-                seen_agents.add(t.agent_id)
-        return latest_thoughts
-    return thoughts
+    latest_thoughts: list[Thought] = []
+    seen_agents: set[str] = set()
+    for t in thoughts:
+        if t.agent_id not in seen_agents:
+            latest_thoughts.append(t)
+            seen_agents.add(t.agent_id)
+    return latest_thoughts
 
 
 async def get_queue(db: AsyncSession, session_id: str) -> list[QueueEntry]:

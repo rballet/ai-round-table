@@ -84,7 +84,7 @@ export class WSSimulator {
             max_rounds: 2,
             convergence_majority: 0.7,
             priority_weights: { recency: 1.0, novelty: 1.0, role: 1.0 },
-            thought_inspector_enabled: false,
+            thought_inspector_enabled: true,
           },
         },
       },
@@ -189,6 +189,32 @@ export class WSSimulator {
       { delayMs: 3360, event: { type: 'UPDATE_END', ...base(3360), agent_id: 'agt_part_2' } },
       { delayMs: 3420, event: { type: 'UPDATE_END', ...base(3420), agent_id: 'agt_part_3' } },
       {
+        delayMs: 3450,
+        event: {
+          type: 'THOUGHT_UPDATED',
+          ...base(3450),
+          thought: {
+            id: 'thought_nia_v1',
+            agent_id: 'agt_part_2',
+            version: 1,
+            content: 'Alex makes a fair point about operational burden. A modular monolith might be the pragmatic choice, but I want to push on whether one isolated service could prove out the pattern.',
+          },
+        },
+      },
+      {
+        delayMs: 3480,
+        event: {
+          type: 'THOUGHT_UPDATED',
+          ...base(3480),
+          thought: {
+            id: 'thought_ravi_v1',
+            agent_id: 'agt_part_3',
+            version: 1,
+            content: 'Reliability perspective: splitting without clear SLO ownership is dangerous. I need data on where incidents actually come from before recommending extraction.',
+          },
+        },
+      },
+      {
         delayMs: 3600,
         event: {
           type: 'TOKEN_REQUEST',
@@ -274,6 +300,32 @@ export class WSSimulator {
       { delayMs: 4770, event: { type: 'UPDATE_START', ...base(4770), agent_id: 'agt_part_3' } },
       { delayMs: 5070, event: { type: 'UPDATE_END', ...base(5070), agent_id: 'agt_part_1' } },
       { delayMs: 5130, event: { type: 'UPDATE_END', ...base(5130), agent_id: 'agt_part_3' } },
+      {
+        delayMs: 5160,
+        event: {
+          type: 'THOUGHT_UPDATED',
+          ...base(5160),
+          thought: {
+            id: 'thought_alex_v1',
+            agent_id: 'agt_part_1',
+            version: 1,
+            content: 'Nia is right that a single high-change domain extraction could be a good experiment. I should propose concrete measurable gates so this stays bounded.',
+          },
+        },
+      },
+      {
+        delayMs: 5190,
+        event: {
+          type: 'THOUGHT_UPDATED',
+          ...base(5190),
+          thought: {
+            id: 'thought_ravi_v2',
+            agent_id: 'agt_part_3',
+            version: 2,
+            content: 'Nia\'s point about isolating one high-change domain resonates. Reliability gates before extraction — that\'s my next argument. Need specific thresholds though.',
+          },
+        },
+      },
       {
         delayMs: 5310,
         event: {
@@ -361,6 +413,32 @@ export class WSSimulator {
       { delayMs: 6780, event: { type: 'UPDATE_END', ...base(6780), agent_id: 'agt_part_1' } },
       { delayMs: 6840, event: { type: 'UPDATE_END', ...base(6840), agent_id: 'agt_part_2' } },
       {
+        delayMs: 6870,
+        event: {
+          type: 'THOUGHT_UPDATED',
+          ...base(6870),
+          thought: {
+            id: 'thought_alex_v2',
+            agent_id: 'agt_part_1',
+            version: 2,
+            content: 'Ravi\'s reliability gate framing is exactly what I needed. I can synthesise this: modular monolith with explicit ownership and measurable extraction thresholds.',
+          },
+        },
+      },
+      {
+        delayMs: 6900,
+        event: {
+          type: 'THOUGHT_UPDATED',
+          ...base(6900),
+          thought: {
+            id: 'thought_nia_v2',
+            agent_id: 'agt_part_2',
+            version: 2,
+            content: 'I\'m moving closer to agreeing. The reliability gates idea addresses my concern about premature extraction. Convergence feels near.',
+          },
+        },
+      },
+      {
         delayMs: 7050,
         event: {
           type: 'QUEUE_UPDATED',
@@ -423,6 +501,32 @@ export class WSSimulator {
       { delayMs: 7930, event: { type: 'UPDATE_START', ...base(7930), agent_id: 'agt_part_3' } },
       { delayMs: 8230, event: { type: 'UPDATE_END', ...base(8230), agent_id: 'agt_part_2' } },
       { delayMs: 8290, event: { type: 'UPDATE_END', ...base(8290), agent_id: 'agt_part_3' } },
+      {
+        delayMs: 8320,
+        event: {
+          type: 'THOUGHT_UPDATED',
+          ...base(8320),
+          thought: {
+            id: 'thought_nia_v3',
+            agent_id: 'agt_part_2',
+            version: 3,
+            content: 'Alex\'s round 2 proposal is strong. I want to add that product guardrails are non-negotiable — the team must not extract purely for technical reasons without user-outcome evidence.',
+          },
+        },
+      },
+      {
+        delayMs: 8350,
+        event: {
+          type: 'THOUGHT_UPDATED',
+          ...base(8350),
+          thought: {
+            id: 'thought_ravi_v3',
+            agent_id: 'agt_part_3',
+            version: 3,
+            content: 'The proposal is almost right. I still think we need a quarterly checkpoint mechanism baked in, not just thresholds. Will push for that in my next turn.',
+          },
+        },
+      },
       {
         delayMs: 8470,
         event: {
@@ -509,6 +613,32 @@ export class WSSimulator {
       { delayMs: 9940, event: { type: 'UPDATE_END', ...base(9940), agent_id: 'agt_part_1' } },
       { delayMs: 10000, event: { type: 'UPDATE_END', ...base(10000), agent_id: 'agt_part_3' } },
       {
+        delayMs: 10030,
+        event: {
+          type: 'THOUGHT_UPDATED',
+          ...base(10030),
+          thought: {
+            id: 'thought_alex_v3',
+            agent_id: 'agt_part_1',
+            version: 3,
+            content: 'Nia\'s product guardrail condition feels right. I\'m nearly ready to converge. Just need Ravi\'s synthesis to close the loop.',
+          },
+        },
+      },
+      {
+        delayMs: 10060,
+        event: {
+          type: 'THOUGHT_UPDATED',
+          ...base(10060),
+          thought: {
+            id: 'thought_ravi_v4',
+            agent_id: 'agt_part_3',
+            version: 4,
+            content: 'This is it. Modular monolith, explicit gates, quarterly checkpoint. I can synthesise all three positions. Ready for final argument.',
+          },
+        },
+      },
+      {
         delayMs: 10180,
         event: {
           type: 'TOKEN_REQUEST',
@@ -575,6 +705,32 @@ export class WSSimulator {
       { delayMs: 11230, event: { type: 'UPDATE_START', ...base(11230), agent_id: 'agt_part_2' } },
       { delayMs: 11530, event: { type: 'UPDATE_END', ...base(11530), agent_id: 'agt_part_1' } },
       { delayMs: 11590, event: { type: 'UPDATE_END', ...base(11590), agent_id: 'agt_part_2' } },
+      {
+        delayMs: 11620,
+        event: {
+          type: 'THOUGHT_UPDATED',
+          ...base(11620),
+          thought: {
+            id: 'thought_alex_v4',
+            agent_id: 'agt_part_1',
+            version: 4,
+            content: 'Ravi\'s synthesis captured it perfectly. I agree with the final framing. No further arguments needed from me.',
+          },
+        },
+      },
+      {
+        delayMs: 11650,
+        event: {
+          type: 'THOUGHT_UPDATED',
+          ...base(11650),
+          thought: {
+            id: 'thought_nia_v4',
+            agent_id: 'agt_part_2',
+            version: 4,
+            content: 'Consensus reached in my view. Modular monolith with product and reliability guardrails, reviewed quarterly. This is actionable.',
+          },
+        },
+      },
       {
         delayMs: 11740,
         event: {

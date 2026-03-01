@@ -263,6 +263,7 @@ async def get_transcript(
 async def get_thoughts(
     session_id: str,
     version: Optional[int] = None,
+    agent_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ) -> ThoughtsResponseSchema:
     session = await session_service.get_session(db, session_id)
@@ -270,7 +271,7 @@ async def get_thoughts(
         raise HTTPException(status_code=404, detail="Session not found")
 
     agents_map = {a.id: a.display_name for a in session.agents}
-    thoughts = await session_service.get_thoughts(db, session_id, version)
+    thoughts = await session_service.get_thoughts(db, session_id, version, agent_id)
 
     thoughts_out = []
     for t in thoughts:
