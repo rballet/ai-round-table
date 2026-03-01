@@ -12,6 +12,7 @@ services:
     environment:
       # Override DATABASE_URL to use the Docker volume path instead of the local default.
       - DATABASE_URL=sqlite+aiosqlite:///./data/ai_round_table.db
+      - LLM_TIMEOUT_SECONDS=${LLM_TIMEOUT_SECONDS:-120}
     volumes:
       - backend_data:/app/data
     healthcheck:
