@@ -14,13 +14,20 @@ from llm.types import LLMConfig, Message
 try:  # pragma: no cover - exercised indirectly when dependency is installed
     from google import genai
     from google.genai import types as genai_types
-    from google.api_core.exceptions import ResourceExhausted as GeminiRateLimitError
+    # Rate-limit errors are exposed directly by the google-genai SDK.
+    # google.api_core is an optional transitive dep and must not be imported
+    # in the same try-block — its absence would silently disable the provider.
+    from google.genai.errors import ClientError as GeminiClientError
 except ImportError:  # pragma: no cover - local fallback for missing dependency
     genai = None
     genai_types = None
+    GeminiClientError = None
 
-    class GeminiRateLimitError(Exception):
-        pass
+
+def _is_rate_limit(exc: Exception) -> bool:
+    """Return True if a GeminiClientError indicates HTTP 429 rate limiting."""
+    # google.genai.errors.ClientError carries a numeric `code` attribute.
+    return getattr(exc, "code", None) == 429
 
 
 class GeminiProvider(BaseLLMProvider):
@@ -73,9 +80,9 @@ class GeminiProvider(BaseLLMProvider):
                 contents=contents,
                 config=config_arg,
             )
-        except GeminiRateLimitError as exc:
-            raise LLMRateLimitError("Gemini rate limited the request.") from exc
         except Exception as exc:
+            if GeminiClientError and isinstance(exc, GeminiClientError) and _is_rate_limit(exc):
+                raise LLMRateLimitError("Gemini rate limited the request.") from exc
             raise LLMProviderError("Gemini completion request failed.") from exc
 
         text = _extract_text(response)

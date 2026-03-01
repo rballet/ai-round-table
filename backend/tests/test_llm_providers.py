@@ -264,12 +264,12 @@ async def test_gemini_provider_raises_invalid_response_on_empty_text():
 async def test_gemini_provider_maps_rate_limit_error(monkeypatch):
     import llm.providers.gemini as gemini_module
 
-    class FakeRateLimitError(Exception):
-        pass
+    class FakeClientError(Exception):
+        code = 429
 
-    monkeypatch.setattr(gemini_module, "GeminiRateLimitError", FakeRateLimitError)
+    monkeypatch.setattr(gemini_module, "GeminiClientError", FakeClientError)
 
-    provider = GeminiProvider(client=FakeGeminiClient(error=FakeRateLimitError("limited")))
+    provider = GeminiProvider(client=FakeGeminiClient(error=FakeClientError("limited")))
 
     with pytest.raises(LLMRateLimitError):
         await provider.complete(
