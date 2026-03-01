@@ -61,6 +61,11 @@ async def create_session(
     request: CreateSessionRequestSchema,
     db: AsyncSession = Depends(get_db),
 ) -> SessionResponseSchema:
+    if request.supporting_context and len(request.supporting_context) > 4000:
+        raise HTTPException(
+            status_code=422,
+            detail="supporting_context exceeds the maximum length of 4000 characters.",
+        )
     session = await session_service.create_session(db, request)
     base = _serialize_session(session)
     agents_out = [

@@ -6,11 +6,16 @@ interface Step1TopicProps {
   onNext: () => void;
 }
 
+const MAX_CONTEXT_CHARS = 4000;
+
 export function Step1Topic({ onNext }: Step1TopicProps) {
   const { wizard, setWizardTopic, setWizardContext } = useSessionStore();
+  const contextLen = wizard.supporting_context.length;
+  const contextOverLimit = contextLen > MAX_CONTEXT_CHARS;
+  const contextNearLimit = !contextOverLimit && contextLen > MAX_CONTEXT_CHARS * 0.85;
 
   const handleNext = () => {
-    if (!wizard.topic.trim()) return;
+    if (!wizard.topic.trim() || contextOverLimit) return;
     onNext();
   };
 
@@ -51,9 +56,38 @@ export function Step1Topic({ onNext }: Step1TopicProps) {
             value={wizard.supporting_context}
             onChange={(e) => setWizardContext(e.target.value)}
             rows={6}
-            className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white transition resize-y"
+            aria-describedby="context-count context-preview"
+            className={`w-full px-3 py-2 rounded-lg border text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 transition resize-y bg-white dark:bg-zinc-900 ${
+              contextOverLimit
+                ? 'border-red-500 focus:ring-red-500'
+                : contextNearLimit
+                ? 'border-amber-400 focus:ring-amber-400'
+                : 'border-zinc-300 dark:border-zinc-700 focus:ring-zinc-900 dark:focus:ring-white'
+            }`}
           />
-          <p className="text-xs text-zinc-400">{wizard.supporting_context.length} characters</p>
+          <p
+            id="context-count"
+            className={`text-xs ${
+              contextOverLimit
+                ? 'text-red-500 font-medium'
+                : contextNearLimit
+                ? 'text-amber-500'
+                : 'text-zinc-400'
+            }`}
+          >
+            {contextLen.toLocaleString()} / {MAX_CONTEXT_CHARS.toLocaleString()} characters
+            {contextOverLimit && ' — exceeds limit'}
+          </p>
+          {wizard.supporting_context.trim() && (
+            <details id="context-preview" className="mt-2">
+              <summary className="cursor-pointer text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 select-none">
+                Preview in Think prompt
+              </summary>
+              <pre className="mt-2 p-3 rounded-md bg-zinc-100 dark:bg-zinc-800 text-xs text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap font-mono overflow-auto max-h-48">
+{`Supporting context:\n${wizard.supporting_context.trim()}`}
+              </pre>
+            </details>
+          )}
         </div>
       </div>
 
@@ -61,7 +95,7 @@ export function Step1Topic({ onNext }: Step1TopicProps) {
         <button
           type="button"
           onClick={handleNext}
-          disabled={!wizard.topic.trim()}
+          disabled={!wizard.topic.trim() || contextOverLimit}
           className="px-5 py-2 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
           aria-label="Go to next step: Agent Lineup"
         >
