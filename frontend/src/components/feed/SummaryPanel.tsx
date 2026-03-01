@@ -20,12 +20,14 @@ const terminationLabel: Record<Exclude<TerminationReason, null>, string> = {
   consensus: 'Consensus',
   cap: 'Round Cap',
   host: 'Host End',
+  error: 'Error',
 };
 
 const terminationStyles: Record<Exclude<TerminationReason, null>, string> = {
   consensus: 'bg-emerald-100 text-emerald-800',
   cap: 'bg-slate-200 text-slate-700',
   host: 'bg-amber-100 text-amber-800',
+  error: 'bg-rose-100 text-rose-800',
 };
 
 function renderInlineMarkdown(text: string): ReactNode[] {

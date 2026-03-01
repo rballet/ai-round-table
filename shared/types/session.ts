@@ -1,6 +1,6 @@
 export type SessionStatus = 'configured' | 'running' | 'paused' | 'ended';
 
-export type TerminationReason = 'consensus' | 'cap' | 'host' | null;
+export type TerminationReason = 'consensus' | 'cap' | 'host' | 'error' | null;
 
 export interface SessionConfig {
   max_rounds: number;

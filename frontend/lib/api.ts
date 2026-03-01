@@ -25,7 +25,15 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
     });
 
     if (!res.ok) {
-        throw new Error(`API Error: ${res.statusText}`);
+        let message = res.statusText;
+        try {
+            const body = await res.json();
+            if (typeof body.detail === 'string') message = body.detail;
+            else if (Array.isArray(body.detail)) message = body.detail.map((e: { msg: string }) => e.msg).join('; ');
+        } catch {
+            // body wasn't JSON, use statusText
+        }
+        throw new Error(`API Error ${res.status}: ${message}`);
     }
 
     if (res.status === 204 || res.headers.get('content-length') === '0') {

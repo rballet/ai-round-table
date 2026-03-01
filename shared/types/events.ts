@@ -94,7 +94,7 @@ export interface SessionResumedEvent extends BaseEvent {
 
 export interface SessionEndEvent extends BaseEvent {
     type: 'SESSION_END';
-    reason: 'consensus' | 'cap' | 'host';
+    reason: 'consensus' | 'cap' | 'host' | 'error';
     rounds_elapsed: number;
     summary_id?: string;
 }
@@ -104,7 +104,7 @@ export interface SummaryPostedEvent extends BaseEvent {
     summary: {
         id: string;
         content: string;
-        termination_reason: 'consensus' | 'cap' | 'host';
+        termination_reason: 'consensus' | 'cap' | 'host' | 'error';
     };
 }
 

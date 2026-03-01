@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Mapping, Any
 import json
@@ -74,6 +75,7 @@ class ModeratorEngine:
         participant_count: int,
         state: ModeratorState,
         moderator_agent: AgentContext,
+        convergence_majority: float = 1.0,
     ) -> ConvergenceCheckResult:
         messages = build_moderator_prompt(
             topic=topic,
@@ -114,7 +116,7 @@ class ModeratorEngine:
         else:
             state.consecutive_converging_turns = 0
 
-        convergence_threshold = max(participant_count, 1)
+        convergence_threshold = max(math.ceil(participant_count * convergence_majority), 1)
         should_terminate = state.consecutive_converging_turns >= convergence_threshold
 
         return ConvergenceCheckResult(

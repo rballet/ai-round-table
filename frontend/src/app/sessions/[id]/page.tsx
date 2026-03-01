@@ -106,9 +106,10 @@ function useCompletedSession(sessionId: string | null) {
 
 interface LiveSessionInnerProps {
   sessionId: string;
+  initialSession?: SessionResponse;
 }
 
-function LiveSessionInner({ sessionId }: LiveSessionInnerProps) {
+function LiveSessionInner({ sessionId, initialSession }: LiveSessionInnerProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [startPrompt, setStartPrompt] = useState('');
   const [isStarting, setIsStarting] = useState(false);
@@ -143,59 +144,65 @@ function LiveSessionInner({ sessionId }: LiveSessionInnerProps) {
   useEffect(() => {
     let mounted = true;
 
-    api
-      .getSession(sessionId)
-      .then((response) => {
-        if (!mounted) return;
-        initializeSession(response);
-        setStartPrompt(response.topic);
+    const handleResponse = (response: SessionResponse) => {
+      if (!mounted) return;
+      initializeSession(response);
+      setStartPrompt(response.topic);
 
-        if (response.status === 'ended') {
-          api
-            .getSummary(sessionId)
-            .then((summaryRes) => {
-              if (mounted) {
-                setSummary({
-                  id: summaryRes.id,
-                  content: summaryRes.content,
-                  termination_reason: summaryRes.termination_reason as 'consensus' | 'cap' | 'host',
-                });
-              }
-            })
-            .catch((err) => {
-              console.error('Failed to load summary for ended session:', err);
-            });
-        }
+      if (response.status === 'ended') {
+        api
+          .getSummary(sessionId)
+          .then((summaryRes) => {
+            if (mounted) {
+              setSummary({
+                id: summaryRes.id,
+                content: summaryRes.content,
+                termination_reason: summaryRes.termination_reason as 'consensus' | 'cap' | 'host' | 'error',
+              });
+            }
+          })
+          .catch((err) => {
+            console.error('Failed to load summary for ended session:', err);
+          });
+      }
 
-        if (response.config.thought_inspector_enabled) {
-          api
-            .getThoughts(sessionId)
-            .then((thoughtsRes) => {
-              if (mounted && thoughtsRes.thoughts.length > 0) {
-                setAgentThoughts(
-                  thoughtsRes.thoughts.map((t) => ({
-                    id: t.id,
-                    agent_id: t.agent_id,
-                    version: t.version,
-                    content: t.content,
-                  }))
-                );
-              }
-            })
-            .catch((err) => {
-              console.error('Failed to load thoughts for session:', err);
-            });
-        }
-      })
-      .catch((error) => {
-        if (!mounted) return;
-        setLoadError(error instanceof Error ? error.message : 'Failed to load session');
-      });
+      if (response.config.thought_inspector_enabled) {
+        api
+          .getThoughts(sessionId)
+          .then((thoughtsRes) => {
+            if (mounted && thoughtsRes.thoughts.length > 0) {
+              setAgentThoughts(
+                thoughtsRes.thoughts.map((t) => ({
+                  id: t.id,
+                  agent_id: t.agent_id,
+                  version: t.version,
+                  content: t.content,
+                }))
+              );
+            }
+          })
+          .catch((err) => {
+            console.error('Failed to load thoughts for session:', err);
+          });
+      }
+    };
+
+    if (initialSession) {
+      handleResponse(initialSession);
+    } else {
+      api
+        .getSession(sessionId)
+        .then(handleResponse)
+        .catch((error) => {
+          if (!mounted) return;
+          setLoadError(error instanceof Error ? error.message : 'Failed to load session');
+        });
+    }
 
     return () => {
       mounted = false;
     };
-  }, [sessionId, initializeSession, setSummary, setAgentThoughts]);
+  }, [sessionId, initialSession, initializeSession, setSummary, setAgentThoughts]);
 
   const handleStartSession = useCallback(async () => {
     setIsStarting(true);
@@ -495,6 +502,7 @@ export default function SessionPage() {
     );
   }
 
-  // Live session path — WS connection happens inside LiveSessionInner
-  return <LiveSessionInner sessionId={sessionId} />;
+  // Live session path — WS connection happens inside LiveSessionInner.
+  // Pass the already-fetched session to avoid a second api.getSession() call.
+  return <LiveSessionInner sessionId={sessionId} initialSession={data?.sessionResponse} />;
 }

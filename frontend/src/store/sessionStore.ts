@@ -254,14 +254,8 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
     set((state) => {
       switch (event.type) {
         case 'SESSION_START': {
-          const agentStatuses =
-            state.agents.length === event.agents.length
-              ? state.agentStatuses
-              : toIdleStatuses(event.agents);
-          const raisedHands =
-            state.agents.length === event.agents.length
-              ? state.raisedHands
-              : toLoweredHands(event.agents);
+          const agentStatuses = toIdleStatuses(event.agents);
+          const raisedHands = toLoweredHands(event.agents);
           const resolvedConfig = event.config ?? state.session?.config;
           return {
             session: state.session

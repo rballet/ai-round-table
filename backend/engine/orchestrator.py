@@ -39,6 +39,7 @@ class SessionOrchestrator:
         self._pause_event.set()
         self._termination_flag = False
         self._termination_reason: str | None = None
+        self._session_end_emitted: bool = False
 
     async def pause(self) -> None:
         self._pause_event.clear()
@@ -72,7 +73,17 @@ class SessionOrchestrator:
             config = session.config
             agents = [self._to_agent_context(agent) for agent in session.agents]
             participants = [a for a in agents if a.role == "participant"]
-            moderator_agent = [a for a in agents if a.role == "moderator"][0]
+            moderator_agents = [a for a in agents if a.role == "moderator"]
+            if not moderator_agents:
+                await self._emit_event(
+                    "ERROR",
+                    {
+                        "code": "NO_MODERATOR",
+                        "message": "Session has no moderator agent. Cannot run.",
+                    },
+                )
+                return
+            moderator_agent = moderator_agents[0]
             priority_weights = {}
             if isinstance(config, dict):
                 priority_weights = config.get("priority_weights", {}) or {}
@@ -140,9 +151,9 @@ class SessionOrchestrator:
             if not success:
                 break
 
+        rounds_elapsed = moderator_state.total_turns_elapsed // max(1, len(participants))
         scribes = [a for a in agents if a.role == "scribe"]
         if scribes:
-            rounds_elapsed = moderator_state.total_turns_elapsed // max(1, len(participants))
             await self._phase_scribe(
                 topic=topic,
                 prompt=prompt,
@@ -151,6 +162,26 @@ class SessionOrchestrator:
                 termination_reason=self._termination_reason or "cap",
                 rounds_elapsed=rounds_elapsed,
             )
+
+        if not self._session_end_emitted:
+            # Fallback: queue exhausted without a scribe (or scribe did not emit SESSION_END).
+            await self._emit_event(
+                "SESSION_END",
+                {
+                    "reason": self._termination_reason or "cap",
+                    "rounds_elapsed": rounds_elapsed,
+                    "summary_id": None,
+                },
+            )
+            async with self._session_factory() as db:
+                result = await db.execute(
+                    select(Session).where(Session.id == self._session_id)
+                )
+                session_obj = result.scalar_one_or_none()
+                if session_obj:
+                    session_obj.status = "ended"
+                    session_obj.termination_reason = self._termination_reason or "cap"
+                    await db.commit()
 
     async def _phase_think(
         self,
@@ -417,6 +448,13 @@ class SessionOrchestrator:
                 db, session_id=self._session_id
             )
             
+        convergence_majority = 1.0
+        if isinstance(config, dict):
+            try:
+                convergence_majority = float(config.get("convergence_majority", 1.0))
+            except (ValueError, TypeError):
+                pass
+
         convergence_result = await moderator.evaluate_convergence(
             topic=topic,
             supporting_context=supporting_context,
@@ -425,6 +463,7 @@ class SessionOrchestrator:
             participant_count=len(participants),
             state=moderator_state,
             moderator_agent=moderator_agent,
+            convergence_majority=convergence_majority,
         )
 
         await self._emit_event(
@@ -829,6 +868,7 @@ class SessionOrchestrator:
                     message=str(exc),
                     agent_id=scribe.id,
                 )
+            self._session_end_emitted = True
             await self._emit_event(
                 "SESSION_END",
                 {
@@ -856,6 +896,7 @@ class SessionOrchestrator:
                     message=str(exc),
                     agent_id=scribe.id,
                 )
+            self._session_end_emitted = True
             await self._emit_event(
                 "SESSION_END",
                 {
@@ -876,6 +917,7 @@ class SessionOrchestrator:
             }
         }
         await self._emit_event("SUMMARY_POSTED", payload)
+        self._session_end_emitted = True
         await self._emit_event(
             "SESSION_END",
             {

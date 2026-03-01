@@ -26,12 +26,14 @@ const TERMINATION_LABELS: Record<string, string> = {
   consensus: 'Consensus',
   cap: 'Round Cap',
   host: 'Host End',
+  error: 'Error',
 };
 
 const TERMINATION_STYLES: Record<string, string> = {
   consensus: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
   cap: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400',
   host: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+  error: 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300',
 };
 
 const ROLE_BADGE_STYLES: Record<Agent['role'], string> = {
