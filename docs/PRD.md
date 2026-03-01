@@ -1,10 +1,10 @@
 # AI Round Table — Product Requirements Document
 
-**Version:** 0.1 — Draft  
-**Status:** In Review  
-**Author:** Raphael — Dipolo AI  
-**Date:** February 2026  
-**Stack:** Next.js · FastAPI · WebSockets · PostgreSQL
+**Version:** 0.2
+**Status:** Current
+**Author:** Raphael — Dipolo AI
+**Date:** February 2026 (updated March 2026)
+**Stack:** Next.js · FastAPI · WebSockets · SQLite
 
 ---
 
@@ -75,15 +75,20 @@ Agents are not constrained to a fixed role taxonomy at the system level. Each ag
 
 The UI provides a set of **preset templates** the host can start from and modify freely. These presets are conveniences, not system constraints — no agent receives special treatment in the orchestration logic based on its template of origin.
 
-| Preset Template | Suggested Default Description |
+Presets are stored in SQLite and seeded on backend startup. They are organised into six categories for navigation:
+
+| Category | Example Presets |
 |---|---|
-| **Moderator** | Orchestrates turn order, manages the priority queue, detects consensus, enforces turn cap. No opinions. |
-| **Scribe** | Produces the final structured summary. No opinions. Activated only on the final turn. |
-| **SME** | Deep domain knowledge; grounds arguments in data and evidence. |
-| **Decision-Maker** | Strategic, high-level perspective; evaluates trade-offs and business impact. |
-| **Practitioner** | Real-world, on-the-ground experience; surfaces practical constraints. |
-| **Challenger** | Actively contests prevailing positions; breaks groupthink; demands evidence for every claim. |
-| **Connector** | Finds cross-domain themes; bridges divergent arguments; synthesises toward consensus. |
+| **General** | Socratic Questioner, Devil's Advocate, Data Scientist, Ethicist, Systems Thinker, Futurist, Domain Expert |
+| **Business** | CEO, CFO, CTO, Product Manager, Investor/VC, Legal Counsel, Strategic Advisor |
+| **Science & Research** | Principal Investigator, Peer Reviewer, Statistician, Grant Writer |
+| **Policy** | Policy Analyst, Economist, Lobbyist, Civil Servant |
+| **Engineering** | Tech Lead, Security Engineer, QA Engineer, DevOps Engineer, Architect |
+| **Creative** | Art Director, Writer, Critic, Producer |
+
+Moderator and Scribe presets are universal (not categorised) since they are mandatory structural roles.
+
+Hosts can also **save custom presets** from their agent lineup for reuse across sessions. User-created presets are persisted in SQLite alongside system presets and can be deleted; system presets are protected.
 
 > **Moderator and Scribe are the only structurally distinct agents.** Their prompts explicitly forbid positional statements and they do not participate in the token queue as speakers. All other agents — regardless of preset — are treated identically by the orchestration engine.
 
@@ -273,10 +278,10 @@ At any time, the host can trigger an immediate end via the UI. This behaves iden
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Next.js Frontend                                           │
-│  ┌──────────────┐  ┌─────────────┐  ┌──────────────────┐  │
-│  │ Poker Table  │  │ Argument    │  │ Session Setup &  │  │
-│  │ Canvas       │  │ Feed        │  │ Host Controls    │  │
-│  └──────────────┘  └─────────────┘  └──────────────────┘  │
+│  ┌──────────────┐  ┌─────────────┐  ┌──────────────────┐    │
+│  │ Poker Table  │  │ Argument    │  │ Session Setup &  │    │
+│  │ Canvas       │  │ Feed        │  │ Host Controls    │    │
+│  └──────────────┘  └─────────────┘  └──────────────────┘    │
 │           │                │                  │             │
 │           └────────────────┴──────────────────┘             │
 │                         WebSocket                           │
@@ -284,17 +289,17 @@ At any time, the host can trigger an immediate end via the UI. This behaves iden
                                │
 ┌──────────────────────────────▼──────────────────────────────┐
 │  FastAPI Backend (single process)                           │
-│  ┌────────────────┐  ┌──────────────────────────────────┐  │
-│  │ Session        │  │ Moderator Engine                 │  │
-│  │ Orchestrator   │  │ - asyncio.PriorityQueue (live)   │  │
-│  │                │  │ - Claim registry                 │  │
-│  │                │  │ - Convergence evaluator          │  │
-│  └────────────────┘  └──────────────────────────────────┘  │
-│  ┌────────────────┐  ┌──────────────────────────────────┐  │
-│  │ Agent Engine   │  │ WebSocket Broadcast Manager      │  │
-│  │ - Think        │  │ - In-process fan-out             │  │
-│  │ - Update       │  │ - session_id → WS connection set │  │
-│  │ - Argue        │  └──────────────────────────────────┘  │
+│  ┌────────────────┐  ┌──────────────────────────────────┐   │
+│  │ Session        │  │ Moderator Engine                 │   │
+│  │ Orchestrator   │  │ - asyncio.PriorityQueue (live)   │   │
+│  │                │  │ - Claim registry                 │   │
+│  │                │  │ - Convergence evaluator          │   │
+│  └────────────────┘  └──────────────────────────────────┘   │
+│  ┌────────────────┐  ┌──────────────────────────────────┐   │
+│  │ Agent Engine   │  │ WebSocket Broadcast Manager      │   │
+│  │ - Think        │  │ - In-process fan-out             │   │
+│  │ - Update       │  │ - session_id → WS connection set │   │
+│  │ - Argue        │  └──────────────────────────────────┘   │
 │  │ - Decide       │                                         │
 │  └────────────────┘                                         │
 └──────────────────────────────┬──────────────────────────────┘
@@ -302,10 +307,15 @@ At any time, the host can trigger an immediate end via the UI. This behaves iden
                     ┌──────────▼──────────┐
                     │   SQLite (on disk)  │
                     │   Sessions          │
+                    │   Agents            │
                     │   Transcripts       │
                     │   Thoughts          │
                     │   Queue audit log   │
+                    │   Moderator state   │
                     │   Summaries         │
+                    │   Error events      │
+                    │   Agent presets     │
+                    │   Session templates │
                     └─────────────────────┘
 ```
 
@@ -333,17 +343,22 @@ Each opinion-bearing agent has four distinct prompt templates:
 ### 8.3 WebSocket Event Schema
 
 ```
-SESSION_START       { session_id, topic, agents[], config }
+SESSION_START       { session_id, topic, prompt, agents[] }
 THINK_START         { agent_id }
 THINK_END           { agent_id }
-TOKEN_GRANTED       { agent_id }
-ARGUMENT_POSTED     { agent_id, argument_id, content, turn_index }
+TOKEN_GRANTED       { agent_id, round_index, turn_index }
+ARGUMENT_POSTED     { argument: { id, agent_id, agent_name, round_index, turn_index, content } }
 UPDATE_START        { agent_id }
 UPDATE_END          { agent_id }
-QUEUE_UPDATED       { queue: [{ agent_id, priority_score, novelty_tier }] }
-CONVERGENCE_CHECK   { status: "converging" | "open" | "capped" }
-TOKEN_REQUEST       { agent_id, novelty_tier, accepted: bool }
-SESSION_END         { reason: "consensus" | "cap" | "host", summary_id }
+THOUGHT_UPDATED     { thought: { id, agent_id, version, content } }   // only if thought_inspector_enabled
+TOKEN_REQUEST       { agent_id, novelty_tier, priority_score, position_in_queue }
+QUEUE_UPDATED       { queue: [{ agent_id, priority_score, novelty_tier, position }] }
+CONVERGENCE_CHECK   { status: "open" | "converging" | "cap_reached", rounds_elapsed, novel_claims_this_round }
+SESSION_PAUSED      { }
+SESSION_RESUMED     { }
+SUMMARY_POSTED      { summary: { id, content, termination_reason } }
+SESSION_END         { reason: "consensus" | "cap" | "host", rounds_elapsed }
+ERROR               { code, message, agent_id? }
 ```
 
 ---
@@ -378,13 +393,15 @@ A chronological feed displays each public Argument in a speech-bubble layout, at
 
 | Field | Description |
 |---|---|
+| **Session template** | Optional. Load a saved template to pre-fill the agent lineup and session config. The topic is always left blank (question-specific). Every field remains editable after loading. |
 | **Topic / Question** | Required free text. The anchor for the entire session. |
-| **Supporting context** | Optional. The host may attach documents, background notes, URLs, or raw text to be shared with all agents as a knowledge base. This context is injected into every agent's Think prompt before the discussion begins. No new context can be added once the session starts. |
-| **Agent lineup** | Add any number of agents. For each: display name, free-text persona description, free-text area of expertise, LLM provider, and LLM model. Preset templates are available as a starting point. |
+| **Supporting context** | Optional. The host may attach background notes or raw text (max 4 000 characters) to be shared with all agents as a knowledge base. Injected into every agent's Think prompt before the discussion begins. No new context can be added once the session starts. |
+| **Agent lineup** | Add any number of agents. For each: display name, free-text persona description, free-text area of expertise, LLM provider, and LLM model. Presets are browsable by category and any configured agent can be saved as a custom preset for reuse. |
 | **Max rounds** | Hard turn cap expressed as total rounds, where one round = one speaking turn per participating agent (default: 3 rounds). |
 | **Convergence majority** | % of agents that must align on the dominant position to trigger organic convergence (default: 60%). |
 | **Priority weights** | W_recency, W_novelty, W_role sliders (defaults: 0.4, 0.5, 0.1). |
 | **Thought visibility** | Toggle whether private Thoughts are visible to the host during the session via the Thought inspector. Thoughts are always stored regardless of this setting. |
+| **Save as template** | Save the current agent lineup and session config as a named, reusable template (topic excluded). Templates persist in SQLite and appear in the template picker on future sessions. |
 
 ---
 
@@ -392,14 +409,14 @@ A chronological feed displays each public Argument in a speech-bubble layout, at
 
 ```
 Session
-  id, topic, supporting_context (text / JSONB array of documents),
-  status, config (JSONB), created_at, ended_at, termination_reason
+  id, topic, supporting_context (text, max 4 000 chars),
+  status, config (JSON), created_at, ended_at, termination_reason
 
 Agent
   id, session_id, display_name, persona_description (text),
-  expertise (text), llm_provider, llm_model, llm_config (JSONB)
+  expertise (text), llm_provider, llm_model, llm_config (JSON), role
   → Any agent can be configured with any provider/model independently.
-  → Moderator and Scribe are flagged via a role enum: {moderator, scribe, participant}.
+  → role enum: {moderator, scribe, participant}
 
 Thought
   id, agent_id, session_id, version (increments per Update), content, created_at
@@ -414,11 +431,26 @@ QueueEntry
   created_at, processed_at
 
 ModeratorState
-  session_id, claim_registry (JSONB), alignment_map (JSONB),
+  session_id, claim_registry (JSON), alignment_map (JSON),
   rounds_elapsed, novel_claims_last_round, consecutive_empty_rounds
 
 Summary
   id, session_id, scribe_agent_id, content, termination_reason, created_at
+
+ErrorEvent                                            (SPEC-302)
+  id, session_id, agent_id (nullable), code, message, created_at
+  → LLM timeouts, parse failures, and orchestrator errors logged here.
+
+AgentPreset                                           (SPEC-401)
+  id, display_name, persona_description, expertise,
+  suggested_model, llm_provider, category, is_system (bool)
+  → System presets seeded on startup (31 presets, 6 categories).
+  → User presets created via POST /agents/presets; deletable (system presets protected).
+
+SessionTemplate                                       (SPEC-402)
+  id, name, description (nullable), agents (JSON), config (JSON), created_at
+  → Topic excluded. Agents and config are snapshots — sessions derived from a
+    template are fully independent after creation.
 ```
 
 ---
@@ -426,17 +458,36 @@ Summary
 ## 11. API Endpoints
 
 ```
-POST   /sessions                       Create a new session with agent config
-POST   /sessions/{id}/start            Submit human prompt and supporting context, begin token flow
-GET    /sessions/{id}/transcript       Full public argument history
-GET    /sessions/{id}/thoughts         Full private thought log (always available)
-GET    /sessions/{id}/queue            Current priority queue snapshot
-POST   /sessions/{id}/pause            Freeze token queue
-POST   /sessions/{id}/resume           Resume token queue
-POST   /sessions/{id}/end              Force terminate → trigger Scribe
-GET    /sessions/{id}/summary          Retrieve Scribe's final document
-WS     /sessions/{id}/stream           Real-time event stream
-GET    /agents/personas                List available preset persona templates
+# Session lifecycle
+GET    /sessions                              List all sessions
+POST   /sessions                              Create a new session with agent config
+GET    /sessions/{id}                         Get session metadata and current status
+DELETE /sessions/{id}                         Delete session and all associated data
+POST   /sessions/{id}/start                   Submit human prompt, begin token flow
+POST   /sessions/{id}/pause                   Freeze token queue
+POST   /sessions/{id}/resume                  Resume token queue
+POST   /sessions/{id}/end                     Force terminate → trigger Scribe
+
+# Session data
+GET    /sessions/{id}/transcript              Full public argument history
+GET    /sessions/{id}/thoughts                Private thought log (filter: ?agent_id=, ?version=)
+GET    /sessions/{id}/queue                   Current priority queue snapshot
+GET    /sessions/{id}/summary                 Retrieve Scribe's final document
+GET    /sessions/{id}/errors                  Error events logged during the session
+
+# Session templates
+GET    /sessions/templates                    List all saved templates
+POST   /sessions/templates                    Save a new template (agents + config, no topic)
+DELETE /sessions/templates/{id}               Delete a template
+POST   /sessions/{id}/save-as-template        Create a template from an existing session
+
+# Agent presets
+GET    /agents/presets                        List all presets (system + user-created)
+POST   /agents/presets                        Save a user-created preset
+DELETE /agents/presets/{id}                   Delete a user preset (403 for system presets)
+
+# WebSocket
+WS     /sessions/{id}/stream                  Real-time event stream
 ```
 
 ---
