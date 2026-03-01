@@ -404,6 +404,75 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 ---
 
+## Improvements & Enhancements
+
+Post-Phase-3 improvements that are not tied to a specific release phase. Each is self-contained and can be implemented independently.
+
+---
+
+### SPEC-401 · Categorised Persona Library
+
+**Track:** Backend + Frontend
+**Status:** Planned
+
+#### Rationale
+
+The current preset panel presents all agent personas in a flat list. As domain-specific persona sets are added (e.g. startup board meeting, scientific review, policy analysis), the list would become unmanageable without structure. Additionally, there is no way for a user to save a custom persona they crafted for reuse in future sessions — they must reconfigure from scratch each time.
+
+This spec introduces:
+1. A `category` field on presets, surfaced in the UI as filter pills for quick navigation
+2. A persistent user preset library backed by SQLite, so custom personas survive browser clears and are accessible from any device hitting the same backend
+
+The default moderator and scribe remain universal (not categorised) since they are mandatory structural roles rather than domain-specific personas.
+
+#### Design Decisions
+
+- **Filter UI: pills (Option A)** — a horizontal row of category pills above the preset list, one active at a time, defaulting to `General`. Chosen for scannability and minimal footprint.
+- **Category discovery: derived from data** — the frontend collects unique `category` values from the preset list it already fetches; no separate endpoint needed.
+- **Persistence: SQLite, no auth** — single-user for now. When multi-user support is added, a `user_id` FK can be added to the table without changing the API contract.
+- **System presets seeded on startup** — the hardcoded list in `agents.py` is replaced by a DB seed that runs once on first boot, tagged with `is_system=True`. The `GET /agents/presets` response shape is identical whether rows come from the seed or user creation, so the frontend requires no contract changes in either phase.
+
+#### Backend
+
+- [ ] Add `AgentPreset` ORM model (`backend/models/agent_preset.py`) with columns: `id` (UUID PK), `display_name`, `persona_description`, `expertise`, `suggested_model`, `llm_provider`, `category`, `is_system` (bool)
+- [ ] Alembic migration for the new table
+- [ ] Seed function: on startup, insert system presets if the table is empty (idempotent)
+- [ ] `GET /agents/presets` — query DB, return all rows ordered by `is_system DESC, display_name ASC`
+- [ ] `POST /agents/presets` — validate + insert user preset (`is_system=False`), return `201` with created record
+- [ ] `DELETE /agents/presets/{id}` — delete user preset; return `403` if `is_system=True`
+- [ ] Unit tests for preset service (seed idempotency, CRUD, system-preset guard)
+
+#### Shared Types
+
+- [ ] Add `category: string` and `is_system: boolean` to `AgentPreset` in `shared/types/agent.ts`
+- [ ] Add `CreatePresetRequest` interface to `shared/types/api.ts`
+- [ ] Mirror both changes in `backend/schemas/agent.py` and `backend/schemas/api.py`
+
+#### Frontend
+
+- [ ] Category filter pills above the preset list — `General | Business | Science & Research | Policy | Engineering | Creative` — defaulting to `General`
+- [ ] User-created presets show a `×` delete button; system presets do not
+- [ ] "Save as preset" icon button on each configured agent card in the lineup — opens an inline form (name + category picker), then `POST /agents/presets`
+- [ ] Optimistic removal on delete with error rollback
+- [ ] MSW handlers updated: `POST /agents/presets` (201), `DELETE /agents/presets/{id}` (204 / 403 for system)
+
+#### Initial Category Set
+
+| Key | Label | Example personas |
+|---|---|---|
+| `general` | General | Socratic Questioner, Devil's Advocate, Data Scientist, Ethicist, Systems Thinker, Futurist, Domain Expert |
+| `business` | Business | CEO, CFO, CTO, Product Manager, Investor/VC, Legal Counsel, Strategic Advisor |
+| `science` | Science & Research | Principal Investigator, Peer Reviewer, Statistician, Grant Writer |
+| `policy` | Policy | Policy Analyst, Economist, Lobbyist, Civil Servant |
+| `engineering` | Engineering | Tech Lead, Security Engineer, QA Engineer, DevOps Engineer, Architect |
+| `creative` | Creative | Art Director, Writer, Critic, Producer |
+
+**Done when:** The preset panel shows category pills, filtering works, user presets can be saved from the lineup and deleted from the panel, system presets are protected from deletion, and all user presets survive a backend restart.
+
+**Future extension:** Adding `user_id` FK to `agent_presets` and filtering by identity in the service layer enables per-user libraries without touching the API contract or frontend.
+
+---
+
 ## Development Guidelines
 
 ### Branching
