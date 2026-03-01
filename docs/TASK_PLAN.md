@@ -538,6 +538,52 @@ This spec introduces two complementary flows:
 
 ---
 
+### SPEC-403 · Agent Web Search Tool
+
+**Track:** Backend + Frontend
+**Status:** Planned
+
+#### Rationale
+
+Agents currently only have access to the supporting context provided at session creation. This limits the quality of discussions on recent events, fast-moving topics, or questions that benefit from cited facts. Giving agents the ability to search the web before speaking would meaningfully improve the depth and accuracy of their arguments.
+
+#### Design Decisions
+
+- **Opt-in per agent** — web search is enabled via a toggle on the agent form. Not every agent needs it; a "Researcher" role benefits most, while a "Devil's Advocate" can reason purely from the debate transcript.
+- **Agent decides when to search** — rather than hardwiring search as a fixed step, the think phase runs with a `web_search(query)` tool definition exposed to the LLM. The agent calls it only if it decides external information would strengthen its reasoning. If it doesn't call the tool, no search happens and no latency is added.
+- **How it works** — the think prompt runs with tool use enabled. If the LLM returns a tool call, the backend executes the search, appends results to the context, and calls the LLM a second time to produce the actual thought. If the LLM returns a thought directly, the extra round-trip is skipped entirely.
+- **Search provider** — Tavily or Brave Search API (both designed for LLM integration). Abstracted behind a `SearchClient` similar to `LLMClient`, so the provider can be swapped without touching agent logic.
+- **Results are not persisted** — search results are transient context for that think cycle only. Only the final thought and argument are saved to SQLite.
+- **Tool calling abstraction** — each `LLMProvider` implementation handles tool calling in its own way (OpenAI `tools`, Anthropic `tools`, Gemini `function_declarations`). `LLMClient` normalises the interface so `AgentRunner` stays provider-agnostic.
+
+#### Backend
+
+- [ ] Add `web_search_enabled: bool` field to `Agent` ORM model and Alembic migration
+- [ ] Implement `SearchClient` with `search(query: str) -> list[SearchResult]` — abstract base + Tavily/Brave implementation
+- [ ] Add `TAVILY_API_KEY` / `BRAVE_API_KEY` to `backend/core/config.py` and `.env.example`
+- [ ] Extend `LLMClient.complete()` to accept an optional `tools` list and return either a message or a tool call result — each provider handles the native format internally
+- [ ] Update `think.py` prompt builder to include the `web_search` tool definition when `web_search_enabled=True`
+- [ ] Implement the two-step think loop in `AgentRunner.think()`: first call with tools → if tool call returned, execute search and call again → produce final thought
+- [ ] Broadcast `SEARCH_START` before executing a search call, `SEARCH_END` after
+- [ ] Unit tests for `SearchClient` (mocked HTTP), tool call parsing per provider, and the two-step think loop
+
+#### Shared Types
+
+- [ ] Add `web_search_enabled: boolean` to `Agent` in `shared/types/agent.ts`
+- [ ] Add `SEARCH_START` and `SEARCH_END` to the `RoundTableEvent` union in `shared/types/events.ts`
+- [ ] Mirror changes in `backend/schemas/agent.py`
+
+#### Frontend
+
+- [ ] Add "Enable web search" toggle to the agent form in the setup wizard (step 2)
+- [ ] Agent seat shows a search indicator when `SEARCH_START` is received (distinct from the think spinner)
+- [ ] MSW handlers updated to reflect `web_search_enabled` on agent fixtures
+- [ ] WS Simulator extended to optionally emit `SEARCH_START` / `SEARCH_END` between `THINK_START` and `THINK_END`
+
+**Done when:** An agent with web search enabled autonomously decides to call the search tool during its think phase when it judges external information useful, results are incorporated into its thought, and the frontend shows the search state visually during the session.
+
+---
+
 ## Development Guidelines
 
 ### Branching
