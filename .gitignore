@@ -1,5 +1,6 @@
 node_modules
 backend/venv/
+backend/.pytest_cache/
 backend/__pycache__/
 backend/alembic/__pycache__/
 backend/core/__pycache__/
