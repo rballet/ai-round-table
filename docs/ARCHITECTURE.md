@@ -1,9 +1,9 @@
 # AI Round Table — Technical Design
 
-**Version:** 0.1  
-**Status:** Draft  
-**Author:** Raphael — Dipolo AI  
-**Date:** February 2026  
+**Version:** 0.2
+**Status:** Current
+**Author:** Raphael — Dipolo AI
+**Date:** February 2026 (updated March 2026)
 **Depends on:** PRD v0.1
 
 ---
@@ -52,11 +52,11 @@ The `shared/types` package is the contract boundary. The frontend imports from i
 
 ```
 backend/
-├── main.py                     # FastAPI app entry point, router registration
+├── main.py                     # FastAPI app entry point, router registration, lifespan
 ├── core/
 │   ├── config.py               # Settings via pydantic-settings
 │   ├── database.py             # SQLAlchemy async engine + session factory
-│   └── exceptions.py           # Custom exception classes
+│   └── prompt_logger.py        # Per-session prompt logging utility
 ├── models/                     # SQLAlchemy ORM models
 │   ├── session.py
 │   ├── agent.py
@@ -64,28 +64,38 @@ backend/
 │   ├── argument.py
 │   ├── queue_entry.py
 │   ├── moderator_state.py
-│   └── summary.py
+│   ├── summary.py
+│   ├── error_event.py          # LLM/orchestrator error tracking (SPEC-302)
+│   ├── agent_preset.py         # Reusable agent personas (SPEC-401)
+│   └── session_template.py     # Saved session configs (SPEC-402)
 ├── schemas/                    # Pydantic request/response schemas
 │   ├── session.py
 │   ├── agent.py
 │   ├── events.py               # WebSocket event payloads
 │   └── api.py
 ├── routers/
-│   ├── sessions.py             # REST: session lifecycle
-│   ├── agents.py               # REST: agent/persona management
+│   ├── sessions.py             # REST: session lifecycle + templates
+│   ├── agents.py               # REST: agent preset management
 │   └── websocket.py            # WS: /sessions/{id}/stream
 ├── engine/
-│   ├── moderator.py            # ModeratorEngine: queue, convergence, state
-│   ├── agent_runner.py         # AgentRunner: LLM call dispatcher per phase
 │   ├── orchestrator.py         # SessionOrchestrator: main async loop
+│   ├── agent_runner.py         # AgentRunner: stateless LLM call dispatcher per phase
+│   ├── moderator.py            # ModeratorEngine: queue, convergence, state
 │   ├── queue_manager.py        # QueueManager: asyncio.PriorityQueue wrapper
-│   └── broadcast_manager.py    # BroadcastManager: in-process WS fan-out
+│   ├── broadcast_manager.py    # BroadcastManager: in-process WS fan-out
+│   ├── context.py              # AgentContext + ContextBundle dataclasses
+│   └── utils.py                # Shared utilities (e.g. strip_code_fences)
 ├── llm/
 │   ├── client.py               # Unified async LLM client (provider abstraction)
+│   ├── errors.py               # LLM-specific exceptions
+│   ├── types.py                # Message + LLMConfig TypedDicts
 │   ├── providers/
+│   │   ├── base.py             # Abstract base: complete(messages) → str
 │   │   ├── openai.py
 │   │   ├── anthropic.py
-│   │   └── base.py             # Abstract base: complete(messages) → str
+│   │   ├── gemini.py           # Google GenAI SDK
+│   │   ├── ollama.py           # Local Ollama via OpenAI-compatible API
+│   │   └── mock.py             # Deterministic mock for testing
 │   └── prompts/
 │       ├── think.py
 │       ├── update.py
@@ -94,11 +104,14 @@ backend/
 │       ├── moderator.py
 │       └── scribe.py
 ├── services/
-│   ├── session_service.py      # DB operations for sessions
+│   ├── session_service.py      # DB operations for sessions + transcript/thoughts/queue/summary
 │   ├── agent_service.py
 │   ├── thought_service.py
 │   ├── argument_service.py
-│   └── queue_service.py        # QueueEntry audit log writes
+│   ├── queue_service.py        # QueueEntry audit log writes
+│   ├── error_service.py        # Error event persistence (SPEC-302)
+│   ├── preset_service.py       # Agent preset CRUD + system preset seeding (SPEC-401)
+│   └── template_service.py     # Session template CRUD (SPEC-402)
 └── alembic/                    # DB migrations
     └── versions/
 ```
@@ -174,6 +187,9 @@ class LLMClient:
     _providers: dict[str, BaseLLMProvider] = {
         "openai": OpenAIProvider(),
         "anthropic": AnthropicProvider(),
+        "gemini": GeminiProvider(),
+        "ollama": OllamaProvider(),
+        "mock": MockProvider(),
     }
 
     async def complete(
@@ -196,49 +212,51 @@ Adding a new provider = adding a file in `llm/providers/` and registering it in 
 
 ```
 frontend/
-├── app/                        # Next.js App Router
-│   ├── page.tsx                # Home: session list + create new
-│   ├── sessions/
-│   │   ├── new/
-│   │   │   └── page.tsx        # Session setup wizard
-│   │   └── [id]/
-│   │       └── page.tsx        # Live round table view
-│   └── layout.tsx
-├── components/
-│   ├── table/
-│   │   ├── RoundTable.tsx      # Main canvas/SVG table
-│   │   ├── AgentSeat.tsx       # Individual agent avatar + status
-│   │   ├── TokenChip.tsx       # Animated token
-│   │   └── QueuePanel.tsx      # Priority queue sidebar
-│   ├── feed/
-│   │   ├── ArgumentFeed.tsx    # Scrollable argument list
-│   │   ├── ArgumentBubble.tsx  # Single argument card (role badge + expand/collapse)
-│   │   ├── SummaryPanel.tsx    # SESSION_END/SUMMARY_POSTED overlay with Markdown summary
-│   │   └── ThoughtInspector.tsx # Expandable private thought panel
-│   ├── setup/
-│   │   ├── SessionSetupForm.tsx
-│   │   ├── AgentConfigurator.tsx  # Per-agent: name, persona, model
-│   │   ├── ContextUploader.tsx    # Supporting documents
-│   │   └── PresetsPanel.tsx       # Persona template picker
-│   ├── controls/
-│   │   ├── HostControls.tsx    # Pause/Resume/Force end
-│   │   └── SessionStatus.tsx   # Round counter, convergence meter
-│   └── ui/                     # Shared primitives (Button, Card, Badge…)
-├── hooks/
-│   ├── useSession.ts           # Session data + REST calls
-│   ├── useWebSocket.ts         # WS connection + event dispatch
-│   ├── useTableLayout.ts       # Agent seat position calculations
-│   └── useAgentStatus.ts       # Derived agent state from WS events
-├── lib/
-│   ├── api.ts                  # Typed REST client (wraps fetch)
-│   ├── mock/
-│   │   ├── handlers.ts         # MSW request handlers
-│   │   ├── fixtures.ts         # Static mock data
-│   │   └── simulator.ts        # Fake WS event emitter for UI dev
-│   └── utils.ts
-├── store/
-│   └── sessionStore.ts         # Zustand: live session state
-└── types/                      # Re-exports from shared/types
+├── src/
+│   ├── app/                        # Next.js App Router
+│   │   ├── page.tsx                # Home: session list + search/filter + create new
+│   │   ├── sessions/
+│   │   │   ├── new/
+│   │   │   │   └── page.tsx        # Session setup wizard (with TemplatePicker)
+│   │   │   └── [id]/
+│   │   │       └── page.tsx        # Live round table view
+│   │   └── layout.tsx
+│   ├── components/
+│   │   ├── table/
+│   │   │   ├── RoundTable.tsx      # Main canvas/SVG table
+│   │   │   ├── AgentSeat.tsx       # Individual agent avatar + status
+│   │   │   ├── TokenChip.tsx       # Animated token
+│   │   │   ├── QueuePanel.tsx      # Priority queue sidebar
+│   │   │   └── ThoughtInspector.tsx # Expandable private thought panel (SPEC-301)
+│   │   ├── feed/
+│   │   │   ├── ArgumentFeed.tsx    # Scrollable argument list (auto-scroll, pause on user scroll)
+│   │   │   ├── ArgumentBubble.tsx  # Single argument card (role badge + expand/collapse)
+│   │   │   ├── SummaryPanel.tsx    # SESSION_END/SUMMARY_POSTED overlay with Markdown summary
+│   │   │   └── ErrorNotification.tsx # Inline error display for ERROR events (SPEC-302)
+│   │   ├── setup/
+│   │   │   ├── Step1Topic.tsx      # Topic + supporting context input
+│   │   │   ├── Step2Agents.tsx     # Agent lineup: add/remove/configure
+│   │   │   ├── Step3Config.tsx     # Session config + "Save as template" (SPEC-402)
+│   │   │   ├── AgentForm.tsx       # Per-agent: name, persona, model + "Save as preset" (SPEC-401)
+│   │   │   ├── PresetPanel.tsx     # Persona picker with category filters + delete (SPEC-401)
+│   │   │   └── TemplatePicker.tsx  # Template loader with optimistic delete (SPEC-402)
+│   │   ├── controls/
+│   │   │   └── SessionStatus.tsx   # Round counter, convergence meter, pause/resume/end
+│   │   ├── history/
+│   │   │   └── CompletedSessionView.tsx # Read-only transcript + summary + Markdown export (SPEC-303)
+│   │   └── ui/                     # Shared primitives (StatusBadge, StepIndicator, Toast)
+│   ├── hooks/
+│   │   └── useWebSocket.ts         # WS connection + event dispatch to Zustand store
+│   └── store/
+│       └── sessionStore.ts         # Zustand: live session state + loadWizardFromTemplate
+├── lib/                            # Utilities (not under src/)
+│   ├── api.ts                      # Typed REST client (wraps fetch)
+│   └── mock/
+│       ├── handlers.ts             # MSW request handlers
+│       ├── simulator.ts            # Fake WS event emitter for UI dev
+│       ├── browser.ts              # MSW browser worker setup
+│       └── MSWProvider.tsx         # React provider that activates MSW + simulator
+└── public/                         # Static assets + MSW service worker
 ```
 
 ### 3.2 State Management
@@ -303,7 +321,7 @@ Create a new session with full configuration.
 ```json
 {
   "topic": "Should we use microservices or a monolith for our new platform?",
-  "supporting_context": "Our team has 4 engineers. Current stack is a Django monolith serving 50k MAU.",
+  "supporting_context": "Our team has 4 engineers. Current stack is a Django monolith serving 50k MAU.",  // max 4000 chars
   "config": {
     "max_rounds": 3,
     "convergence_majority": 0.6,
@@ -513,22 +531,143 @@ No request body. Response `202 { "status": "ending" }`.
 
 ---
 
+### `DELETE /sessions/{id}`
+
+Delete a session and all associated data. Response `204`.
+
+---
+
+### `GET /sessions/{id}/errors`
+
+Error events logged during the session (SPEC-302).
+
+**Response `200`**
+```json
+{
+  "session_id": "sess_abc123",
+  "errors": [
+    {
+      "id": "err_001",
+      "code": "LLM_TIMEOUT",
+      "message": "Agent Alex timed out during the Argue phase.",
+      "agent_id": "agt_001",
+      "created_at": "..."
+    }
+  ]
+}
+```
+
+---
+
 ### `GET /agents/presets`
+
+Returns all agent presets — system presets (seeded on startup) and user-created presets.
 
 **Response `200`**
 ```json
 {
   "presets": [
     {
-      "id": "challenger",
+      "id": "uuid-...",
       "display_name": "The Challenger",
       "persona_description": "You actively contest prevailing positions...",
       "expertise": "Critical analysis, logical fallacy detection",
-      "suggested_model": "claude-opus-4-5"
+      "suggested_model": "claude-opus-4-6",
+      "llm_provider": "anthropic",
+      "category": "general",
+      "is_system": true
     }
   ]
 }
 ```
+
+---
+
+### `POST /agents/presets`
+
+Save a user-created persona preset.
+
+**Request**
+```json
+{
+  "display_name": "My Custom Expert",
+  "persona_description": "...",
+  "expertise": "...",
+  "suggested_model": "gpt-4o",
+  "llm_provider": "openai",
+  "category": "engineering"
+}
+```
+
+**Response `201`** — created preset record.
+
+---
+
+### `DELETE /agents/presets/{id}`
+
+Delete a user-created preset. Returns `403` if `is_system=true`. Response `204`.
+
+---
+
+### `GET /sessions/templates`
+
+List all saved session templates (SPEC-402).
+
+**Response `200`**
+```json
+{
+  "templates": [
+    {
+      "id": "uuid-...",
+      "name": "Startup Board v2",
+      "description": "Weekly board meeting format",
+      "agents": [ { "display_name": "CEO", "role": "participant", ... } ],
+      "config": { "max_rounds": 3, ... },
+      "created_at": "..."
+    }
+  ]
+}
+```
+
+---
+
+### `POST /sessions/templates`
+
+Save a new session template.
+
+**Request**
+```json
+{
+  "name": "Startup Board v2",
+  "description": "Optional description",
+  "agents": [ { "display_name": "CEO", "role": "participant", ... } ],
+  "config": { "max_rounds": 3, "convergence_majority": 0.6, ... }
+}
+```
+
+**Response `201`** — created template record.
+
+---
+
+### `DELETE /sessions/templates/{id}`
+
+Delete a session template. Response `204`. Returns `404` if not found.
+
+---
+
+### `POST /sessions/{id}/save-as-template`
+
+Create a template from an existing session's agents and config (topic excluded).
+
+**Request**
+```json
+{
+  "name": "Startup Board v2",
+  "description": "Optional"
+}
+```
+
+**Response `201`** — created template record. Returns `404` if session not found.
 
 ---
 
@@ -955,9 +1094,13 @@ SQLite is configured in WAL (Write-Ahead Logging) mode to support concurrent rea
 
 ```bash
 # .env (backend)
-DATABASE_URL=sqlite+aiosqlite:///./roundtable.db
+DATABASE_URL=sqlite+aiosqlite:///./ai_round_table.db
 OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=...            # Required for Gemini provider
+OLLAMA_BASE_URL=http://localhost:11434  # Required for Ollama provider
+LLM_TIMEOUT_SECONDS=120       # Per-call LLM timeout (default: 120)
+LOG_DIR=                      # Optional: directory for per-session prompt logs
 
 # .env.local (frontend)
 NEXT_PUBLIC_API_URL=http://localhost:8000
@@ -981,8 +1124,10 @@ All backend settings are managed via `pydantic-settings` in `core/config.py`. No
 | `aiosqlite` | Async SQLite driver |
 | `alembic` | DB migrations |
 | `pydantic-settings` | Config management |
-| `openai` | OpenAI API client |
+| `openai` | OpenAI API client (also used by Ollama provider) |
 | `anthropic` | Anthropic API client |
+| `google-genai` | Google Gemini API client |
+| `httpx` | Async HTTP (required by google-genai) |
 | `python-multipart` | File uploads (supporting context) |
 
 ### Frontend
@@ -995,5 +1140,3 @@ All backend settings are managed via `pydantic-settings` in `core/config.py`. No
 | `msw` | API mocking for parallel dev |
 | `tailwindcss` | Styling |
 | `framer-motion` | Token animation + transitions |
-| `@radix-ui/react-*` | Accessible UI primitives |
-| `lucide-react` | Icons |
