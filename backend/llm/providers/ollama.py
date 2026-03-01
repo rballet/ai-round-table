@@ -69,7 +69,7 @@ class OllamaProvider(BaseLLMProvider):
         except OpenAIRateLimitError as exc:
             raise LLMRateLimitError("Ollama rate limited the request.") from exc
         except Exception as exc:
-            raise LLMProviderError("Ollama completion request failed.") from exc
+            raise LLMProviderError(f"Ollama completion request failed: {exc}") from exc
 
         text = _extract_text(response)
         if text is None:

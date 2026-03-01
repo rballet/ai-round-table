@@ -83,7 +83,7 @@ class GeminiProvider(BaseLLMProvider):
         except Exception as exc:
             if GeminiClientError and isinstance(exc, GeminiClientError) and _is_rate_limit(exc):
                 raise LLMRateLimitError("Gemini rate limited the request.") from exc
-            raise LLMProviderError("Gemini completion request failed.") from exc
+            raise LLMProviderError(f"Gemini completion request failed: {exc}") from exc
 
         text = _extract_text(response)
         if text is None:

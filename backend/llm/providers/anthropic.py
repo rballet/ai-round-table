@@ -65,7 +65,7 @@ class AnthropicProvider(BaseLLMProvider):
         except AnthropicRateLimitError as exc:
             raise LLMRateLimitError("Anthropic rate limited the request.") from exc
         except Exception as exc:
-            raise LLMProviderError("Anthropic completion request failed.") from exc
+            raise LLMProviderError(f"Anthropic completion request failed: {exc}") from exc
 
         text = _extract_anthropic_text(response)
         if text is None:
