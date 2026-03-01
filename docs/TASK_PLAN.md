@@ -341,14 +341,14 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 **Track:** Backend + Frontend
 
 **Backend:**
-- [ ] `GET /sessions/{id}/thoughts` supports `?version=` for history
-- [ ] `THOUGHT_UPDATED` events only emitted when `thought_inspector_enabled=true`
+- [x] `GET /sessions/{id}/thoughts` supports `?version=` and `?agent_id=` for history
+- [x] `THOUGHT_UPDATED` events only emitted when `thought_inspector_enabled=true`
 
 **Frontend:**
-- [ ] `ThoughtInspector` panel — expandable sidebar showing current private thought per agent
-- [ ] Updates live on `THOUGHT_UPDATED` events
-- [ ] Thought history viewer — version timeline for each agent
-- [ ] Toggle visibility per session (respects setup config)
+- [x] `ThoughtInspector` panel — expandable sidebar showing current private thought per agent
+- [x] Updates live on `THOUGHT_UPDATED` events
+- [x] Thought history viewer — version timeline for each agent
+- [x] Toggle visibility per session (respects setup config)
 
 ---
 
@@ -357,15 +357,15 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 **Track:** Backend + Frontend
 
 **Backend:**
-- [ ] LLM timeout (30s) → broadcast `ERROR` event, mark agent as `errored`, continue with remaining queue
-- [ ] LLM returns unparseable JSON on Decide/Moderator prompts → retry once, then use fallback (request_token=false)
-- [ ] Agent errors do not crash the orchestration loop
-- [ ] `ERROR` events logged to SQLite
+- [x] LLM timeout (30s) → broadcast `ERROR` event, mark agent as `errored`, continue with remaining queue
+- [x] LLM returns unparseable JSON on Decide/Moderator prompts → retry once, then use fallback (request_token=false)
+- [x] Agent errors do not crash the orchestration loop
+- [x] `ERROR` events logged to SQLite
 
 **Frontend:**
-- [ ] `ERROR` event displays inline notification in argument feed
-- [ ] Errored agent seat shows error state icon
-- [ ] Toast notifications for transient errors
+- [x] `ERROR` event displays inline notification in argument feed
+- [x] Errored agent seat shows error state icon
+- [x] Toast notifications for transient errors
 
 ---
 
@@ -373,10 +373,10 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 
 **Track:** Frontend
 
-- [ ] Home page (`/`) — full session list with search/filter by status
-- [ ] Completed session view — read-only transcript + summary (no live WS)
-- [ ] Session metadata: duration, agent count, rounds, termination reason
-- [ ] Link to download transcript as Markdown
+- [x] Home page (`/`) — full session list with search/filter by status
+- [x] Completed session view — read-only transcript + summary (no live WS)
+- [x] Session metadata: duration, agent count, rounds, termination reason
+- [x] Link to download transcript as Markdown
 
 ---
 
@@ -385,22 +385,22 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 **Track:** Frontend + Backend
 
 **Frontend:**
-- [ ] Context input in session setup — plain text area + paste support
-- [ ] Character/token count indicator
-- [ ] Preview how context will appear in Think prompt
+- [x] Context input in session setup — plain text area + paste support
+- [x] Character/token count indicator with amber warning (>85%) and red over-limit
+- [x] Preview how context will appear in Think prompt (collapsible details)
 
 **Backend:**
-- [ ] Validate context length (max ~4000 chars in v1)
-- [ ] Context stored on `Session.supporting_context`
-- [ ] Injected into Think prompt builder for all agents
+- [x] Validate context length (max ~4000 chars in v1) — 422 on exceed
+- [x] Context stored on `Session.supporting_context`
+- [x] Injected into Think prompt builder for all agents
 
 ---
 
 ### SPEC-305 · End-to-End Tests
 
-- [ ] Backend: pytest integration tests covering full session lifecycle with a mock LLM provider
-- [ ] Frontend: Playwright tests covering session creation, live session UI with simulator, summary display
-- [ ] Contract tests: verify frontend types match backend Pydantic schemas
+- [x] Backend: pytest integration tests covering full session lifecycle with a mock LLM provider
+- [x] Frontend: Playwright tests covering session creation, live session UI with simulator, summary display, session history
+- [x] Contract tests: verify frontend types match backend Pydantic schemas
 
 ---
 
