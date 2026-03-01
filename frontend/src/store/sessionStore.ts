@@ -29,11 +29,35 @@ const defaultConfig: SessionConfig = {
   thought_inspector_enabled: false,
 };
 
+const defaultModerator: AgentDraft = {
+  display_name: 'Moderator',
+  role: 'moderator',
+  persona_description:
+    'A neutral facilitator who steers the discussion, synthesises competing viewpoints, ' +
+    'and keeps participants focused on the topic. Calls for votes when consensus appears ' +
+    'to be forming and ensures every voice is heard.',
+  expertise: 'Facilitation, synthesis, conflict resolution',
+  llm_provider: 'anthropic',
+  llm_model: 'claude-sonnet-4-6',
+};
+
+const defaultScribe: AgentDraft = {
+  display_name: 'Scribe',
+  role: 'scribe',
+  persona_description:
+    'A meticulous note-taker who tracks the evolution of arguments, highlights areas of ' +
+    'agreement and disagreement, and produces a clear structured summary at the end of ' +
+    'the session.',
+  expertise: 'Documentation, synthesis, summarisation',
+  llm_provider: 'anthropic',
+  llm_model: 'claude-haiku-4-5',
+};
+
 const defaultWizard: WizardState = {
   step: 1,
   topic: '',
   supporting_context: '',
-  agents: [],
+  agents: [defaultModerator, defaultScribe],
   config: defaultConfig,
 };
 
