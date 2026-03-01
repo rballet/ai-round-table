@@ -7,12 +7,11 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    env_file:
+      - ./backend/.env
     environment:
+      # Override DATABASE_URL to use the Docker volume path instead of the local default.
       - DATABASE_URL=sqlite+aiosqlite:///./data/ai_round_table.db
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}
     volumes:
       - backend_data:/app/data
     healthcheck:
