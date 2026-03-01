@@ -473,6 +473,71 @@ The default moderator and scribe remain universal (not categorised) since they a
 
 ---
 
+### SPEC-402 · Session Templates
+
+**Track:** Backend + Frontend
+**Status:** Planned
+
+#### Rationale
+
+Every new session currently requires re-configuring the agent lineup and session parameters from scratch. Teams that run the same round table format repeatedly (e.g. a weekly startup board, a recurring policy review panel) must redo this work each time. Similarly, a user who wants to re-run the same discussion setup with a new question has no shortcut — they must rebuild the agent lineup manually.
+
+This spec introduces two complementary flows:
+
+1. **Save as template** — from the session setup wizard, the user names and saves the current agent lineup + session config as a reusable template (topic and supporting context are excluded, since those are question-specific).
+2. **Reuse config** — a button on any existing session pre-fills the setup wizard with that session's agents and config, so the user only needs to supply a new topic.
+
+#### Design Decisions
+
+- **What is saved:** agent lineup (`display_name`, `persona_description`, `expertise`, `llm_provider`, `llm_model`, `llm_config`, `role`) + `SessionConfig` (`max_rounds`, `convergence_majority`, `priority_weights`, `thought_inspector_enabled`). Topic and supporting context are intentionally excluded.
+- **Pre-fill, don't lock** — loading a template populates the wizard but every field remains editable before the session is created. The template is a starting point, not a constraint.
+- **Persistence: SQLite** — same pattern as `agent_presets`. `agents` and `config` are stored as JSON columns.
+- **Reuse config convenience endpoint** — `POST /sessions/{id}/save-as-template` reads the session's existing agents and config and returns a template object, so the frontend can pre-fill the wizard without requiring the user to explicitly save a template first.
+- **No versioning** — templates are immutable snapshots. Editing requires creating a new template; existing sessions are unaffected.
+
+#### Backend
+
+- [ ] Add `SessionTemplate` ORM model (`backend/models/session_template.py`) with columns: `id` (UUID PK), `name` (str), `description` (str, nullable), `agents` (JSON), `config` (JSON), `created_at` (datetime)
+- [ ] Alembic migration for the new table
+- [ ] `GET /sessions/templates` — return all templates ordered `created_at DESC`
+- [ ] `POST /sessions/templates` — validate `CreateTemplateRequest`, insert, return `201` with created record
+- [ ] `DELETE /sessions/templates/{id}` — delete; return `204` on success, `404` if not found
+- [ ] `POST /sessions/{id}/save-as-template` — reads session agents + config, accepts `name` + optional `description` in body, inserts template, returns `201`; return `404` if session not found
+- [ ] Unit tests for template service (list, create, delete, save-as-template from session)
+
+#### Shared Types
+
+- [ ] Add `SessionTemplate` interface to `shared/types/session.ts`: `id`, `name`, `description?`, `agents` (`Omit<Agent, 'id' | 'session_id'>[]`), `config: SessionConfig`, `created_at`
+- [ ] Add `CreateTemplateRequest` interface to `shared/types/api.ts`: `name`, `description?`, `agents`, `config`
+- [ ] Add `TemplatesResponse` interface to `shared/types/api.ts`: `templates: SessionTemplate[]`
+- [ ] Mirror all changes in `backend/schemas/session.py` and `backend/schemas/api.py`
+
+#### Frontend
+
+- [ ] **Template picker** on the new session page (`/sessions/new`) — a collapsible panel or dropdown above step 1 showing saved templates (name, agent count, created date); clicking a template pre-fills steps 2 and 3 and collapses the picker
+- [ ] **"Save as template" button** on step 3 (config step) — opens an inline form (name field + optional description), submits `POST /sessions/templates`, shows success confirmation
+- [ ] **"Reuse config" button** on each session card in the session list (`/`) and on the session detail page (`/sessions/{id}`) — calls `POST /sessions/{id}/save-as-template` (or fetches session data client-side), then navigates to `/sessions/new` with the template pre-loaded into the wizard state
+- [ ] **Delete button** on each template in the picker — calls `DELETE /sessions/templates/{id}` with optimistic removal and error rollback
+- [ ] `api.ts`: add `getTemplates`, `createTemplate`, `deleteTemplate`, `saveSessionAsTemplate` methods
+- [ ] MSW handlers updated: `GET /sessions/templates` (200), `POST /sessions/templates` (201), `DELETE /sessions/templates/:id` (204/404), `POST /sessions/:id/save-as-template` (201)
+
+#### Template Picker Wire Frame
+
+```
+┌─ Load a saved template ──────────────────────────────────────────┐
+│  [Startup Board v2]  5 agents · saved 3 days ago        [Delete] │
+│  [Policy Panel]      4 agents · saved 1 week ago        [Delete] │
+│  [No template — start fresh]                                      │
+└───────────────────────────────────────────────────────────────────┘
+         ↑ collapsible, defaults to collapsed when no templates exist
+```
+
+**Done when:** A template saved from the wizard reappears in the picker on the next visit, loading it pre-fills the agent lineup and config (topic stays blank), "Reuse config" on a past session takes the user to a pre-filled wizard, and all templates survive a backend restart.
+
+**Future extension:** Adding a `source_session_id` FK to `session_templates` allows the UI to show which session a template was derived from, and prevents duplicate templates being created from the same session.
+
+---
+
 ## Development Guidelines
 
 ### Branching
