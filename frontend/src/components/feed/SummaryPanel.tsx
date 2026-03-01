@@ -156,10 +156,10 @@ export function SummaryPanel({ isOpen, summary, terminationReason, onClose }: Su
           role="dialog"
           aria-modal="true"
           aria-label="Session summary"
-          className="w-full rounded-2xl border border-slate-200 bg-white shadow-2xl"
+          className="flex w-full max-h-[90vh] flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl"
           data-testid="summary-panel"
         >
-          <header className="flex items-center justify-between gap-2 border-b border-slate-200 px-5 py-4">
+          <header className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 px-5 py-4">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold text-slate-900">Session Summary</h2>
               {effectiveReason && (
@@ -181,7 +181,7 @@ export function SummaryPanel({ isOpen, summary, terminationReason, onClose }: Su
             </button>
           </header>
 
-          <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
             {summary ? (
               <MarkdownContent content={summary.content} />
             ) : (
