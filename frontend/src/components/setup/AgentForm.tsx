@@ -17,12 +17,45 @@ const roleOptions: { value: AgentRole; label: string }[] = [
   { value: 'participant', label: 'Participant' },
 ];
 
+type ModelOption = { value: string; label: string };
+
+const providerModels: Record<string, ModelOption[]> = {
+  anthropic: [
+    { value: 'claude-opus-4-6',   label: 'claude-opus-4-6 — Most capable' },
+    { value: 'claude-sonnet-4-6', label: 'claude-sonnet-4-6 — Balanced' },
+    { value: 'claude-haiku-4-5',  label: 'claude-haiku-4-5 — Fastest' },
+  ],
+  openai: [
+    { value: 'gpt-5.2',    label: 'gpt-5.2 — Most capable' },
+    { value: 'gpt-5-mini', label: 'gpt-5-mini — Efficient' },
+    { value: 'o3',         label: 'o3 — Reasoning' },
+    { value: 'o4-mini',    label: 'o4-mini — Fast reasoning' },
+  ],
+  gemini: [
+    { value: 'gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview — Most capable' },
+    { value: 'gemini-3-flash-preview', label: 'gemini-3-flash-preview — Fast' },
+    { value: 'gemini-2.5-pro',         label: 'gemini-2.5-pro — Stable, advanced' },
+    { value: 'gemini-2.5-flash',       label: 'gemini-2.5-flash — Stable, fast' },
+  ],
+  ollama: [
+    { value: 'llama3.3',    label: 'llama3.3 — Meta Llama (latest)' },
+    { value: 'deepseek-r1', label: 'deepseek-r1 — Reasoning' },
+    { value: 'qwen3',       label: 'qwen3 — Alibaba (latest)' },
+    { value: 'mistral',     label: 'mistral — Mistral AI' },
+    { value: 'gemma3',      label: 'gemma3 — Google' },
+    { value: 'phi4',        label: 'phi4 — Microsoft' },
+  ],
+  mock: [
+    { value: 'mock', label: 'mock — No API key required' },
+  ],
+};
+
 const providerOptions = [
   { value: 'anthropic', label: 'Anthropic' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'gemini', label: 'Google Gemini' },
-  { value: 'ollama', label: 'Ollama (local)' },
-  { value: 'mock', label: 'Mock (no API key required)' },
+  { value: 'openai',    label: 'OpenAI' },
+  { value: 'gemini',    label: 'Google Gemini' },
+  { value: 'ollama',    label: 'Ollama (local)' },
+  { value: 'mock',      label: 'Mock (no API key required)' },
 ];
 
 const defaultDraft: AgentDraft = {
@@ -31,7 +64,7 @@ const defaultDraft: AgentDraft = {
   persona_description: '',
   expertise: '',
   llm_provider: 'anthropic',
-  llm_model: 'claude-opus-4-6',
+  llm_model: providerModels.anthropic[0].value,
 };
 
 export function AgentForm({ initialValues, disabledRoles, onAdd, onCancel }: AgentFormProps) {
@@ -44,7 +77,6 @@ export function AgentForm({ initialValues, disabledRoles, onAdd, onCancel }: Age
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof AgentDraft, string>> = {};
     if (!form.display_name.trim()) newErrors.display_name = 'Name is required';
-    if (!form.llm_model.trim()) newErrors.llm_model = 'Model is required';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -58,18 +90,10 @@ export function AgentForm({ initialValues, disabledRoles, onAdd, onCancel }: Age
   const set = <K extends keyof AgentDraft>(key: K, value: AgentDraft[K]) => {
     setForm((prev) => {
       const next = { ...prev, [key]: value };
-      // Auto-fill a sensible default model when switching providers
+      // When provider changes, reset model to the first option for that provider.
       if (key === 'llm_provider') {
-        const defaults: Record<string, string> = {
-          anthropic: 'claude-opus-4-6',
-          openai: 'gpt-5.2',
-          gemini: 'gemini-3-flash-preview',
-          ollama: 'llama3.3',
-          mock: 'mock',
-        };
-        if (value === 'mock' || prev.llm_provider === 'mock') {
-          next.llm_model = defaults[value as string] ?? '';
-        }
+        const models = providerModels[value as string] ?? [];
+        next.llm_model = models[0]?.value ?? '';
       }
       return next;
     });
@@ -144,16 +168,24 @@ export function AgentForm({ initialValues, disabledRoles, onAdd, onCancel }: Age
           <label htmlFor="agent-model" className="block text-sm font-medium">
             Model <span className="text-red-500" aria-hidden="true">*</span>
           </label>
-          <input
+          <select
             id="agent-model"
-            type="text"
             value={form.llm_model}
             onChange={(e) => set('llm_model', e.target.value)}
-            placeholder="e.g. claude-opus-4-6"
-            className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white transition"
+            className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white transition"
             aria-required="true"
             aria-describedby={errors.llm_model ? 'agent-model-error' : undefined}
-          />
+          >
+            {(providerModels[form.llm_provider] ?? []).map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          {form.llm_provider === 'ollama' && (
+            <p className="text-xs text-zinc-400">
+              Model must be pulled locally first:{' '}
+              <code className="font-mono">ollama pull {form.llm_model}</code>
+            </p>
+          )}
           {errors.llm_model && (
             <p id="agent-model-error" className="text-xs text-red-500" role="alert">
               {errors.llm_model}
