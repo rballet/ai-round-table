@@ -7,6 +7,7 @@ from .queue_entry import QueueEntry
 from .moderator_state import ModeratorState
 from .summary import Summary
 from .error_event import ErrorEvent
+from .agent_preset import AgentPreset
 
 __all__ = [
     "Base",
@@ -18,4 +19,5 @@ __all__ = [
     "ModeratorState",
     "Summary",
     "ErrorEvent",
+    "AgentPreset",
 ]

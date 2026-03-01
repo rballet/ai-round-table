@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Dict, Literal, Optional
 
 AgentRole = Literal['moderator', 'scribe', 'participant']
@@ -19,11 +19,16 @@ class AgentSchema(BaseModel):
     role: AgentRole
 
 class AgentPresetSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     display_name: str
     persona_description: str
     expertise: str
     suggested_model: str
+    llm_provider: str
+    category: str
+    is_system: bool
 
 class QueueEntrySchema(BaseModel):
     agent_id: str

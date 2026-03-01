@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useState, useCallback } from 'react';
 import { TerminationReason } from 'shared/types/session';
 import { LiveSummary } from '@/store/sessionStore';
 
@@ -143,6 +143,15 @@ function MarkdownContent({ content }: { content: string }) {
 }
 
 export function SummaryPanel({ isOpen, summary, terminationReason, onClose }: SummaryPanelProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    if (!summary) return;
+    await navigator.clipboard.writeText(summary.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [summary]);
+
   if (!isOpen) {
     return null;
   }
@@ -171,14 +180,40 @@ export function SummaryPanel({ isOpen, summary, terminationReason, onClose }: Su
                 </span>
               )}
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600"
-              aria-label="Close summary panel"
-            >
-              Close
-            </button>
+            <div className="flex items-center gap-1">
+              {summary && (
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600"
+                  aria-label="Copy summary to clipboard"
+                >
+                  {copied ? (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="size-3.5 text-emerald-600">
+                        <path fillRule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-emerald-600">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="size-3.5">
+                        <path fillRule="evenodd" d="M11 2.5a.5.5 0 0 1 .5.5v1h1a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 4 12.5v-1H3a.5.5 0 0 1-.5-.5v-7A.5.5 0 0 1 3 3.5h1V3a.5.5 0 0 1 .5-.5h6.5ZM5.5 4v1H5a.5.5 0 0 0-.5.5V12h6.5a.5.5 0 0 0 .5-.5V5.5A.5.5 0 0 0 11.5 5h-.5V4h-5.5ZM6 3h5v1H6V3Zm5.5 3H5.5v.5h6v-.5Z" clipRule="evenodd" />
+                      </svg>
+                      Copy
+                    </>
+                  )}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-600"
+                aria-label="Close summary panel"
+              >
+                Close
+              </button>
+            </div>
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">

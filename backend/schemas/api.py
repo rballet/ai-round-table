@@ -57,6 +57,14 @@ class SummaryResponseSchema(BaseModel):
 class PresetsResponseSchema(BaseModel):
     presets: List[AgentPresetSchema]
 
+class CreatePresetRequestSchema(BaseModel):
+    display_name: str
+    persona_description: str
+    expertise: str
+    suggested_model: str
+    llm_provider: str
+    category: str
+
 class ErrorEventSchema(BaseModel):
     id: str
     session_id: str

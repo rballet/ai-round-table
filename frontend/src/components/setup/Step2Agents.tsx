@@ -50,7 +50,7 @@ export function Step2Agents({ onNext, onBack }: Step2AgentsProps) {
       expertise: preset.expertise,
       llm_model: preset.suggested_model,
       role: 'participant',
-      llm_provider: 'anthropic',
+      llm_provider: preset.llm_provider,
     });
     setShowForm(true);
   };

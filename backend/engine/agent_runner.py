@@ -7,8 +7,11 @@ from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.config import settings
+from core.prompt_logger import log_prompt
 from engine.broadcast_manager import BroadcastManager
 from engine.context import AgentContext, ContextBundle
+from engine.utils import strip_code_fences
 from llm.client import LLMClient
 from llm.prompts.argue import build_argue_messages
 from llm.prompts.decide import build_decide_messages
@@ -51,11 +54,24 @@ class AgentRunner:
     ) -> Thought:
         await self._broadcast("THINK_START", {"agent_id": agent.id})
         try:
+            messages = build_think_messages(context_bundle)
             completion = await self._llm_client.complete(
                 provider=agent.llm_provider,
                 model=agent.llm_model,
-                messages=build_think_messages(context_bundle),
+                messages=messages,
                 config=agent.llm_config or {},
+            )
+            log_prompt(
+                session_id=self._session_id,
+                phase="think",
+                agent_name=agent.display_name,
+                agent_role=agent.role,
+                round_index=context_bundle.round_index,
+                provider=agent.llm_provider,
+                model=agent.llm_model,
+                messages=messages,
+                response=completion,
+                log_dir=settings.LOG_DIR,
             )
             return await thought_service.save_thought(
                 self._db,
@@ -71,11 +87,24 @@ class AgentRunner:
         agent: AgentContext,
         context_bundle: ContextBundle,
     ) -> Argument:
+        messages = build_argue_messages(context_bundle)
         completion = await self._llm_client.complete(
             provider=agent.llm_provider,
             model=agent.llm_model,
-            messages=build_argue_messages(context_bundle),
+            messages=messages,
             config=agent.llm_config or {},
+        )
+        log_prompt(
+            session_id=self._session_id,
+            phase="argue",
+            agent_name=agent.display_name,
+            agent_role=agent.role,
+            round_index=context_bundle.round_index,
+            provider=agent.llm_provider,
+            model=agent.llm_model,
+            messages=messages,
+            response=completion,
+            log_dir=settings.LOG_DIR,
         )
         return await argument_service.save_argument(
             self._db,
@@ -96,11 +125,24 @@ class AgentRunner:
         Saves a new version of the thought to the DB and returns it.
         Broadcasting is the orchestrator's responsibility.
         """
+        messages = build_update_messages(context_bundle)
         completion = await self._llm_client.complete(
             provider=agent.llm_provider,
             model=agent.llm_model,
-            messages=build_update_messages(context_bundle),
+            messages=messages,
             config=agent.llm_config or {},
+        )
+        log_prompt(
+            session_id=self._session_id,
+            phase="update",
+            agent_name=agent.display_name,
+            agent_role=agent.role,
+            round_index=context_bundle.round_index,
+            provider=agent.llm_provider,
+            model=agent.llm_model,
+            messages=messages,
+            response=completion,
+            log_dir=settings.LOG_DIR,
         )
         return await thought_service.save_thought(
             self._db,
@@ -115,11 +157,24 @@ class AgentRunner:
         context_bundle: ContextBundle,
         termination_reason: str,
     ) -> Summary:
+        messages = build_scribe_messages(context_bundle)
         completion = await self._llm_client.complete(
             provider=agent.llm_provider,
             model=agent.llm_model,
-            messages=build_scribe_messages(context_bundle),
+            messages=messages,
             config=agent.llm_config or {},
+        )
+        log_prompt(
+            session_id=self._session_id,
+            phase="scribe",
+            agent_name=agent.display_name,
+            agent_role=agent.role,
+            round_index=None,
+            provider=agent.llm_provider,
+            model=agent.llm_model,
+            messages=messages,
+            response=completion,
+            log_dir=settings.LOG_DIR,
         )
         return await session_service.save_summary(
             self._db,
@@ -143,16 +198,30 @@ class AgentRunner:
         )
         parsed = self._parse_decide_response(completion)
         if parsed is not None:
+            log_prompt(
+                session_id=self._session_id,
+                phase="decide",
+                agent_name=agent.display_name,
+                agent_role=agent.role,
+                round_index=context_bundle.round_index,
+                provider=agent.llm_provider,
+                model=agent.llm_model,
+                messages=messages,
+                response=completion,
+                log_dir=settings.LOG_DIR,
+            )
             return parsed
 
         retry_messages = messages + [
+            {"role": "assistant", "content": completion},
             {
                 "role": "user",
                 "content": (
                     "Your previous response was not valid JSON. "
-                    "Respond with ONLY valid JSON."
+                    "Respond with ONLY valid JSON matching the schema above. "
+                    "No markdown fences, no preamble."
                 ),
-            }
+            },
         ]
         retry_completion = await self._llm_client.complete(
             provider=agent.llm_provider,
@@ -164,7 +233,7 @@ class AgentRunner:
         if retry_parsed is None:
             logger.warning(
                 "Decide parse failed twice for agent %s in session %s; using safe fallback.",
-                "unknown",
+                agent.display_name,
                 self._session_id,
             )
             return DecideResult(
@@ -172,6 +241,18 @@ class AgentRunner:
                 novelty_tier="reinforcement",
                 justification=None,
             )
+        log_prompt(
+            session_id=self._session_id,
+            phase="decide (retry)",
+            agent_name=agent.display_name,
+            agent_role=agent.role,
+            round_index=context_bundle.round_index,
+            provider=agent.llm_provider,
+            model=agent.llm_model,
+            messages=retry_messages,
+            response=retry_completion,
+            log_dir=settings.LOG_DIR,
+        )
         return retry_parsed
 
     async def _broadcast(self, event_type: str, payload: dict) -> None:
@@ -186,7 +267,7 @@ class AgentRunner:
     @staticmethod
     def _parse_decide_response(raw: str) -> DecideResult | None:
         try:
-            payload = json.loads(raw.strip())
+            payload = json.loads(strip_code_fences(raw))
         except json.JSONDecodeError:
             return None
 

@@ -139,7 +139,7 @@ async def test_anthropic_provider_returns_text_and_splits_system_prompt():
     call = fake_client.messages.calls[0]
     assert call["system"] == "Rules"
     assert call["messages"] == [{"role": "user", "content": "Question"}]
-    assert call["max_tokens"] == 1024
+    assert call["max_tokens"] == 4096
     assert call["temperature"] == 0.2
 
 

@@ -500,9 +500,15 @@ async def test_agent_runner_decide_retries_on_malformed_json_then_succeeds(
     assert result.request_token is True
     assert result.novelty_tier == "correction"
     assert result.justification == "Need to correct a factual error."
-    retry_prompt = provider.messages_by_call[1][-1]["content"]
+    retry_messages = provider.messages_by_call[1]
+    # The retry conversation must include the bad first response as an assistant turn
+    # so the model can see what it produced and self-correct.
+    assert retry_messages[-2]["role"] == "assistant"
+    assert retry_messages[-2]["content"] == "not valid json"
+    retry_prompt = retry_messages[-1]["content"]
     assert "previous response was not valid JSON" in retry_prompt
     assert "ONLY valid JSON" in retry_prompt
+    assert "No markdown fences" in retry_prompt
 
 
 @pytest.mark.asyncio
@@ -559,6 +565,94 @@ async def test_agent_runner_decide_returns_fallback_after_two_malformed_json_res
     # Fallback must be the safe default: do not request the token.
     assert result.request_token is False
     assert result.novelty_tier == "reinforcement"
+
+
+def test_parse_decide_response_strips_json_code_fence():
+    """`_parse_decide_response` must handle JSON wrapped in ```json ... ``` fences."""
+    from engine.agent_runner import AgentRunner
+
+    fenced = (
+        "```json\n"
+        '{"request_token": true, "novelty_tier": "new_information", "justification": "New data."}\n'
+        "```"
+    )
+    result = AgentRunner._parse_decide_response(fenced)
+    assert result is not None
+    assert result.request_token is True
+    assert result.novelty_tier == "new_information"
+
+
+def test_parse_decide_response_strips_plain_code_fence():
+    """`_parse_decide_response` must handle JSON wrapped in plain ``` fences."""
+    from engine.agent_runner import AgentRunner
+
+    fenced = (
+        "```\n"
+        '{"request_token": false, "novelty_tier": "reinforcement", "justification": null}\n'
+        "```"
+    )
+    result = AgentRunner._parse_decide_response(fenced)
+    assert result is not None
+    assert result.request_token is False
+    assert result.novelty_tier == "reinforcement"
+
+
+def test_parse_decide_response_returns_none_on_truly_invalid_json():
+    """Genuinely malformed JSON must still return None."""
+    from engine.agent_runner import AgentRunner
+
+    result = AgentRunner._parse_decide_response("{ definitely-not-json")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_decide_warning_includes_agent_name(db: AsyncSession, caplog):
+    """The fallback warning must log the real agent name, not 'unknown'."""
+    import logging
+    from engine.agent_runner import AgentRunner
+
+    session = await session_service.create_session(db, _valid_request())
+    participant = next(a for a in session.agents if a.role == "participant")
+
+    runner = AgentRunner(
+        session_id=session.id,
+        db=db,
+        llm_client=LLMClient(
+            providers={"fake": AlwaysMalformedDecideProvider()},
+            timeout_seconds=5.0,
+            rate_limit_backoff_seconds=0.0,
+        ),
+        broadcast_manager=RecordingBroadcastManager(),
+    )
+    agent_ctx = AgentContext(
+        id=participant.id,
+        display_name=participant.display_name,
+        persona_description=participant.persona_description,
+        expertise=participant.expertise,
+        llm_provider=participant.llm_provider,
+        llm_model=participant.llm_model,
+        llm_config=participant.llm_config,
+        role=participant.role,
+    )
+    bundle = ContextBundle(
+        topic=session.topic,
+        prompt="Test prompt",
+        supporting_context=None,
+        agent=agent_ctx,
+        current_thought="N/A",
+        transcript=[],
+        round_index=1,
+        turn_index=1,
+    )
+
+    with caplog.at_level(logging.WARNING, logger="engine.agent_runner"):
+        await runner.decide(agent_ctx, bundle)
+
+    assert any(
+        participant.display_name in record.message
+        for record in caplog.records
+        if "parse failed" in record.message
+    ), "Warning must include agent's display_name, not 'unknown'"
 
 
 # ---------------------------------------------------------------------------

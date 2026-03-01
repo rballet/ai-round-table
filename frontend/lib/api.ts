@@ -7,8 +7,10 @@ import {
     ThoughtsResponse,
     QueueResponse,
     SummaryResponse,
-    PresetsResponse
+    PresetsResponse,
+    CreatePresetRequest
 } from 'shared/types/api';
+import { AgentPreset } from 'shared/types/agent';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -56,5 +58,7 @@ export const api = {
     deleteSession: (id: string) => fetchApi<void>(`/sessions/${id}`, { method: 'DELETE' }),
     getSummary: (id: string) => fetchApi<SummaryResponse>(`/sessions/${id}/summary`),
     getPresets: () => fetchApi<PresetsResponse>('/agents/presets'),
+    createPreset: (data: CreatePresetRequest) => fetchApi<AgentPreset>('/agents/presets', { method: 'POST', body: JSON.stringify(data) }),
+    deletePreset: (id: string) => fetchApi<void>(`/agents/presets/${id}`, { method: 'DELETE' }),
     getSessions: () => fetchApi<SessionsListResponse>('/sessions'),
 };

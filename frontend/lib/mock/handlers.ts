@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
-import { Agent } from 'shared/types/agent';
+import { Agent, AgentPreset } from 'shared/types/agent';
+import { CreatePresetRequest } from 'shared/types/api';
 
 // ---------------------------------------------------------------------------
 // Fixture data (used by SPEC-101-FE session list + detail pages)
@@ -220,105 +221,31 @@ const MOCK_TRANSCRIPT_003 = [
   },
 ];
 
-const MOCK_PRESETS = [
-  {
-    id: 'preset_challenger',
-    display_name: 'The Challenger',
-    persona_description:
-      'You actively contest prevailing positions, seeking logical weaknesses. You are rigorous and direct.',
-    expertise: 'Critical analysis and logical argumentation',
-    suggested_model: 'claude-opus-4-6',
-  },
-  {
-    id: 'preset_pragmatist',
-    display_name: 'The Pragmatist',
-    persona_description:
-      'You ground every argument in real-world constraints and practical feasibility. You push for actionable conclusions.',
-    expertise: 'Policy, implementation, and systems thinking',
-    suggested_model: 'gpt-5.2',
-  },
-  {
-    id: 'preset_ethicist',
-    display_name: 'The Ethicist',
-    persona_description:
-      'You examine the moral dimensions of every proposal, considering fairness, rights, and long-term consequences.',
-    expertise: 'Ethics, philosophy, and moral reasoning',
-    suggested_model: 'claude-opus-4-6',
-  },
-  {
-    id: 'preset_futurist',
-    display_name: 'The Futurist',
-    persona_description:
-      'You think in decades and extrapolate current trends to anticipate second-order effects.',
-    expertise: 'Technology forecasting and trend analysis',
-    suggested_model: 'gpt-5.2',
-  },
-  {
-    id: 'preset_empiricist',
-    display_name: 'The Empiricist',
-    persona_description:
-      'You demand evidence for every claim and are sceptical of reasoning that lacks empirical grounding.',
-    expertise: 'Data analysis, research methodology, and evidence evaluation',
-    suggested_model: 'claude-sonnet-4-6',
-  },
-  // Business personas
-  {
-    id: 'preset-strategic-advisor',
-    display_name: 'Strategic Advisor',
-    persona_description:
-      'A seasoned executive who evaluates every decision through the lens of long-term competitive positioning. Cuts through noise to identify the one or two moves that will matter most, and is direct about trade-offs between growth, defensibility, and resource constraints.',
-    expertise: 'Corporate strategy, competitive analysis, growth frameworks',
-    suggested_model: 'claude-opus-4-6',
-  },
-  {
-    id: 'preset-venture-capitalist',
-    display_name: 'Venture Capitalist',
-    persona_description:
-      'An investor who has seen hundreds of pitches and knows what separates fundable businesses from wishful thinking. Probes market size, unit economics, founder-market fit, and defensibility. Asks the uncomfortable questions founders avoid.',
-    expertise: 'Venture investing, market sizing, startup due diligence, term sheets',
-    suggested_model: 'gpt-5.2',
-  },
-  {
-    id: 'preset-cfo',
-    display_name: 'Chief Financial Officer',
-    persona_description:
-      'A numbers-first operator who translates every strategic discussion into financial reality. Models cash flow, burn rate, and profitability timelines. Challenges revenue assumptions and insists on clarity around the path to breakeven.',
-    expertise: 'Financial modeling, unit economics, fundraising, cash management',
-    suggested_model: 'gpt-5.2',
-  },
-  {
-    id: 'preset-product-strategist',
-    display_name: 'Product Strategist',
-    persona_description:
-      'A practitioner obsessed with product-market fit. Anchors every discussion in the customer\'s actual problem, pushes back on feature creep, and forces clarity on the single value proposition that drives retention.',
-    expertise: 'Product-market fit, roadmap prioritisation, user research, retention',
-    suggested_model: 'claude-sonnet-4-6',
-  },
-  {
-    id: 'preset-legal-counsel',
-    display_name: 'Legal Counsel',
-    persona_description:
-      'A pragmatic business lawyer who identifies legal risks without becoming a blocker. Flags IP exposure, regulatory landmines, and contractual gaps while proposing workable mitigations.',
-    expertise: 'Corporate law, IP, regulatory compliance, contracts, risk mitigation',
-    suggested_model: 'claude-sonnet-4-6',
-  },
-  {
-    id: 'preset-marketing-strategist',
-    display_name: 'Marketing Strategist',
-    persona_description:
-      'A go-to-market architect who connects product value to the right audience through the right channels. Challenges vague positioning and pushes for a clear, repeatable growth motion before expensive brand campaigns.',
-    expertise: 'Go-to-market strategy, brand positioning, customer acquisition, growth',
-    suggested_model: 'gemini-3.1-pro-preview',
-  },
-  {
-    id: 'preset-operations-lead',
-    display_name: 'Operations Lead',
-    persona_description:
-      'An execution-focused operator who turns strategy into repeatable process. Identifies bottlenecks before they become crises and keeps discussions honest about the gap between what sounds good in a meeting and what works in practice.',
-    expertise: 'Process design, scaling operations, team structure, execution',
-    suggested_model: 'claude-sonnet-4-6',
-  },
+const MOCK_PRESETS: AgentPreset[] = [
+  // General
+  { id: 'preset_challenger', display_name: 'The Challenger', persona_description: 'Systematically challenges proposals', expertise: 'Critical thinking', suggested_model: 'claude-sonnet-4-6', llm_provider: 'anthropic', category: 'general', is_system: true },
+  { id: 'preset_pragmatist', display_name: 'The Pragmatist', persona_description: 'Focuses on practical implementation', expertise: 'Operations and execution', suggested_model: 'claude-sonnet-4-6', llm_provider: 'anthropic', category: 'general', is_system: true },
+  { id: 'preset_data_scientist', display_name: 'Data Scientist', persona_description: 'Grounds arguments in evidence', expertise: 'Data analysis', suggested_model: 'claude-sonnet-4-6', llm_provider: 'anthropic', category: 'general', is_system: true },
+  // Business
+  { id: 'preset_ceo', display_name: 'CEO', persona_description: 'Strategic leader', expertise: 'Corporate strategy', suggested_model: 'gpt-5-mini', llm_provider: 'openai', category: 'business', is_system: true },
+  { id: 'preset_cto', display_name: 'CTO', persona_description: 'Technology architect', expertise: 'Software architecture', suggested_model: 'claude-sonnet-4-6', llm_provider: 'anthropic', category: 'business', is_system: true },
+  { id: 'preset_vc', display_name: 'Investor/VC', persona_description: 'Evaluates market opportunity', expertise: 'Venture capital', suggested_model: 'gpt-5-mini', llm_provider: 'openai', category: 'business', is_system: true },
+  // Science
+  { id: 'preset_pi', display_name: 'Principal Investigator', persona_description: 'Leads research with rigorous methodology', expertise: 'Research design', suggested_model: 'claude-sonnet-4-6', llm_provider: 'anthropic', category: 'science', is_system: true },
+  { id: 'preset_statistician', display_name: 'Statistician', persona_description: 'Audits data quality and statistical inference', expertise: 'Statistics', suggested_model: 'claude-sonnet-4-6', llm_provider: 'anthropic', category: 'science', is_system: true },
+  // Policy
+  { id: 'preset_policy_analyst', display_name: 'Policy Analyst', persona_description: 'Evaluates public policy options', expertise: 'Policy analysis', suggested_model: 'claude-sonnet-4-6', llm_provider: 'anthropic', category: 'policy', is_system: true },
+  { id: 'preset_economist', display_name: 'Economist', persona_description: 'Models incentives and market dynamics', expertise: 'Economics', suggested_model: 'gpt-5-mini', llm_provider: 'openai', category: 'policy', is_system: true },
+  // Engineering
+  { id: 'preset_tech_lead', display_name: 'Tech Lead', persona_description: 'Drives technical decisions', expertise: 'Software engineering', suggested_model: 'claude-sonnet-4-6', llm_provider: 'anthropic', category: 'engineering', is_system: true },
+  { id: 'preset_security', display_name: 'Security Engineer', persona_description: 'Identifies vulnerabilities and threat models', expertise: 'Cybersecurity', suggested_model: 'claude-sonnet-4-6', llm_provider: 'anthropic', category: 'engineering', is_system: true },
+  // Creative
+  { id: 'preset_writer', display_name: 'Writer', persona_description: 'Refines narrative clarity and voice', expertise: 'Writing and storytelling', suggested_model: 'claude-sonnet-4-6', llm_provider: 'anthropic', category: 'creative', is_system: true },
+  { id: 'preset_critic', display_name: 'Critic', persona_description: 'Provides rigorous cultural critique', expertise: 'Critical theory', suggested_model: 'claude-sonnet-4-6', llm_provider: 'anthropic', category: 'creative', is_system: true },
 ];
+
+// In-memory list for user-created presets (POST/DELETE)
+let mockUserPresets: AgentPreset[] = [];
 
 // ---------------------------------------------------------------------------
 // buildMockAgents — used by SPEC-105 live session UI for ad-hoc sessions
@@ -506,6 +433,32 @@ export const handlers = [
   }),
 
   http.get('/agents/presets', () =>
-    HttpResponse.json({ presets: MOCK_PRESETS })
+    HttpResponse.json({ presets: [...MOCK_PRESETS, ...mockUserPresets] })
   ),
+
+  http.post('/agents/presets', async ({ request }) => {
+    const body = await request.json() as CreatePresetRequest;
+    const newPreset: AgentPreset = {
+      id: `user_${Date.now()}`,
+      display_name: body.display_name,
+      persona_description: body.persona_description,
+      expertise: body.expertise,
+      suggested_model: body.suggested_model,
+      llm_provider: body.llm_provider,
+      category: body.category,
+      is_system: false,
+    };
+    mockUserPresets = [...mockUserPresets, newPreset];
+    return HttpResponse.json(newPreset, { status: 201 });
+  }),
+
+  http.delete('/agents/presets/:id', ({ params }) => {
+    const id = String(params.id);
+    const systemPreset = MOCK_PRESETS.find((p) => p.id === id);
+    if (systemPreset) {
+      return HttpResponse.json({ detail: 'Cannot delete system presets.' }, { status: 403 });
+    }
+    mockUserPresets = mockUserPresets.filter((p) => p.id !== id);
+    return new HttpResponse(null, { status: 204 });
+  }),
 ];

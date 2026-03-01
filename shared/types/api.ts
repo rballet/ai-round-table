@@ -63,3 +63,12 @@ export interface SummaryResponse {
 export interface PresetsResponse {
     presets: AgentPreset[];
 }
+
+export interface CreatePresetRequest {
+    display_name: string;
+    persona_description: string;
+    expertise: string;
+    suggested_model: string;
+    llm_provider: string;
+    category: string;
+}

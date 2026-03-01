@@ -19,6 +19,9 @@ export interface AgentPreset {
     persona_description: string;
     expertise: string;
     suggested_model: string;
+    llm_provider: string;
+    category: string;
+    is_system: boolean;
 }
 
 export interface QueueEntry {

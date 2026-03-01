@@ -8,6 +8,7 @@ import json
 from llm.client import LLMClient
 from llm.prompts.moderator import build_moderator_prompt
 from engine.context import AgentContext
+from engine.utils import strip_code_fences
 
 
 NOVELTY_SCORES: dict[str, float] = {
@@ -91,12 +92,7 @@ class ModeratorEngine:
         )
 
         try:
-            cleaned_response = response.strip()
-            if cleaned_response.startswith("```json"):
-                cleaned_response = cleaned_response[7:]
-            if cleaned_response.endswith("```"):
-                cleaned_response = cleaned_response[:-3]
-            parsed = json.loads(cleaned_response)
+            parsed = json.loads(strip_code_fences(response))
         except json.JSONDecodeError:
             parsed = {
                 "status": "open",
