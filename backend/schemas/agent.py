@@ -1,5 +1,11 @@
 from pydantic import BaseModel
-from typing import Optional, Dict
+from typing import Dict, Literal, Optional
+
+AgentRole = Literal['moderator', 'scribe', 'participant']
+NoveltyTier = Literal[
+    'first_argument', 'correction', 'new_information',
+    'disagreement', 'synthesis', 'reinforcement',
+]
 
 class AgentSchema(BaseModel):
     id: str
@@ -10,7 +16,7 @@ class AgentSchema(BaseModel):
     llm_provider: str
     llm_model: str
     llm_config: Optional[Dict] = None
-    role: str
+    role: AgentRole
 
 class AgentPresetSchema(BaseModel):
     id: str
@@ -23,6 +29,6 @@ class QueueEntrySchema(BaseModel):
     agent_id: str
     agent_name: Optional[str] = None
     priority_score: float
-    novelty_tier: str
+    novelty_tier: NoveltyTier
     justification: Optional[str] = None
     position: int

@@ -135,8 +135,9 @@ class MockProvider(BaseLLMProvider):
         )
                 
         # A typical starting prompt with 1 round of arguments is around 2000-3000 chars.
-        # We can simulate convergence once it gets decently long.
-        if total_content_len > 4000:
+        # The threshold must exceed the max supporting_context size (4000 chars) so a
+        # large context input does not trigger premature convergence on the first check.
+        if total_content_len > 8000:
             return json.dumps({
                 "status": "converging",
                 "novel_claims_this_round": 0,

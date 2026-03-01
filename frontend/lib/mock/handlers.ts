@@ -67,7 +67,7 @@ const MOCK_AGENTS: Agent[] = [
     persona_description: 'A balanced, structured moderator who ensures all voices are heard.',
     expertise: 'Facilitation and structured debate',
     llm_provider: 'anthropic',
-    llm_model: 'claude-opus-4-5',
+    llm_model: 'claude-opus-4-6',
     role: 'moderator',
   },
   {
@@ -87,7 +87,7 @@ const MOCK_AGENTS: Agent[] = [
     persona_description: 'You actively contest prevailing positions, seeking logical weaknesses.',
     expertise: 'Critical analysis',
     llm_provider: 'anthropic',
-    llm_model: 'claude-opus-4-5',
+    llm_model: 'claude-opus-4-6',
     role: 'participant',
   },
   {
@@ -97,7 +97,7 @@ const MOCK_AGENTS: Agent[] = [
     persona_description: 'Grounds the discussion in practical implications and real-world constraints.',
     expertise: 'Policy and implementation',
     llm_provider: 'openai',
-    llm_model: 'gpt-4o',
+    llm_model: 'gpt-5.2',
     role: 'participant',
   },
   // Agents for the completed session (sess_mock_003)
@@ -108,7 +108,7 @@ const MOCK_AGENTS: Agent[] = [
     persona_description: 'A neutral moderator who structures the debate and keeps it on track.',
     expertise: 'Facilitation and structured debate',
     llm_provider: 'anthropic',
-    llm_model: 'claude-opus-4-5',
+    llm_model: 'claude-opus-4-6',
     role: 'moderator',
   },
   {
@@ -128,7 +128,7 @@ const MOCK_AGENTS: Agent[] = [
     persona_description: 'Strongly believes open source AI leads to better outcomes for humanity.',
     expertise: 'Open source software and collaborative development',
     llm_provider: 'openai',
-    llm_model: 'gpt-4o',
+    llm_model: 'gpt-5.2',
     role: 'participant',
   },
   {
@@ -138,7 +138,7 @@ const MOCK_AGENTS: Agent[] = [
     persona_description: 'Argues that closed source AI allows for better safety and quality control.',
     expertise: 'Enterprise software and AI safety',
     llm_provider: 'anthropic',
-    llm_model: 'claude-opus-4-5',
+    llm_model: 'claude-opus-4-6',
     role: 'participant',
   },
 ];
@@ -227,7 +227,7 @@ const MOCK_PRESETS = [
     persona_description:
       'You actively contest prevailing positions, seeking logical weaknesses. You are rigorous and direct.',
     expertise: 'Critical analysis and logical argumentation',
-    suggested_model: 'claude-opus-4-5',
+    suggested_model: 'claude-opus-4-6',
   },
   {
     id: 'preset_pragmatist',
@@ -235,7 +235,7 @@ const MOCK_PRESETS = [
     persona_description:
       'You ground every argument in real-world constraints and practical feasibility. You push for actionable conclusions.',
     expertise: 'Policy, implementation, and systems thinking',
-    suggested_model: 'gpt-4o',
+    suggested_model: 'gpt-5.2',
   },
   {
     id: 'preset_ethicist',
@@ -243,7 +243,7 @@ const MOCK_PRESETS = [
     persona_description:
       'You examine the moral dimensions of every proposal, considering fairness, rights, and long-term consequences.',
     expertise: 'Ethics, philosophy, and moral reasoning',
-    suggested_model: 'claude-opus-4-5',
+    suggested_model: 'claude-opus-4-6',
   },
   {
     id: 'preset_futurist',
@@ -251,7 +251,7 @@ const MOCK_PRESETS = [
     persona_description:
       'You think in decades and extrapolate current trends to anticipate second-order effects.',
     expertise: 'Technology forecasting and trend analysis',
-    suggested_model: 'gpt-4o',
+    suggested_model: 'gpt-5.2',
   },
   {
     id: 'preset_empiricist',
@@ -276,7 +276,7 @@ function buildMockAgents(sessionId: string): Agent[] {
             persona_description: 'Maintains structure and fairness.',
             expertise: 'Facilitation',
             llm_provider: 'openai',
-            llm_model: 'gpt-4.1',
+            llm_model: 'gpt-5.2',
             role: 'moderator',
         },
         {
@@ -296,7 +296,7 @@ function buildMockAgents(sessionId: string): Agent[] {
             persona_description: 'Pragmatic backend specialist.',
             expertise: 'Backend architecture',
             llm_provider: 'openai',
-            llm_model: 'gpt-4.1',
+            llm_model: 'gpt-5.2',
             role: 'participant',
         },
         {
@@ -316,7 +316,7 @@ function buildMockAgents(sessionId: string): Agent[] {
             persona_description: 'Reliability and scaling expert.',
             expertise: 'SRE',
             llm_provider: 'openai',
-            llm_model: 'gpt-4.1-mini',
+            llm_model: 'gpt-5-mini',
             role: 'participant',
         },
     ];
@@ -335,12 +335,19 @@ export const handlers = [
 
   http.post('/sessions', async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
+    const supporting_context = (body.supporting_context as string | undefined) ?? '';
+    if (supporting_context.length > 4000) {
+      return HttpResponse.json(
+        { detail: 'supporting_context exceeds maximum length of 4000 characters.' },
+        { status: 422 }
+      );
+    }
     const agentsInput = (body.agents as Array<Record<string, unknown>>) ?? [];
     const newId = `sess_mock_${Date.now()}`;
     const newSession = {
       id: newId,
       topic: (body.topic as string) ?? 'Untitled Session',
-      supporting_context: (body.supporting_context as string | undefined) ?? '',
+      supporting_context,
       status: 'configured',
       config: body.config ?? {
         max_rounds: 10,

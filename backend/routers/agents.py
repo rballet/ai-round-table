@@ -17,7 +17,7 @@ _PRESETS: list[AgentPresetSchema] = [
             "foundational truths through structured inquiry."
         ),
         expertise="Critical thinking, epistemology, philosophical dialogue",
-        suggested_model="gpt-4o",
+        suggested_model="claude-opus-4-6",
     ),
     AgentPresetSchema(
         id="preset-devils-advocate",
@@ -28,7 +28,7 @@ _PRESETS: list[AgentPresetSchema] = [
             "the group to stress-test its conclusions."
         ),
         expertise="Argumentation, risk analysis, stress testing ideas",
-        suggested_model="gpt-4o",
+        suggested_model="gpt-5.2",
     ),
     AgentPresetSchema(
         id="preset-data-scientist",
@@ -39,7 +39,7 @@ _PRESETS: list[AgentPresetSchema] = [
             "correlation from causation."
         ),
         expertise="Statistics, empirical research, data-driven reasoning",
-        suggested_model="gpt-4o",
+        suggested_model="gpt-5.2",
     ),
     AgentPresetSchema(
         id="preset-ethicist",
@@ -50,7 +50,7 @@ _PRESETS: list[AgentPresetSchema] = [
             "unintended consequences and questions of fairness and justice."
         ),
         expertise="Moral philosophy, applied ethics, stakeholder impact analysis",
-        suggested_model="gpt-4o",
+        suggested_model="claude-opus-4-6",
     ),
     AgentPresetSchema(
         id="preset-systems-thinker",
@@ -61,7 +61,7 @@ _PRESETS: list[AgentPresetSchema] = [
             "local optimisations that harm the whole system."
         ),
         expertise="Systems theory, complexity science, feedback dynamics",
-        suggested_model="gpt-4o",
+        suggested_model="claude-sonnet-4-6",
     ),
     AgentPresetSchema(
         id="preset-futurist",
@@ -72,7 +72,7 @@ _PRESETS: list[AgentPresetSchema] = [
             "short-term thinking and champions scenario planning."
         ),
         expertise="Trend analysis, scenario planning, technology forecasting",
-        suggested_model="gpt-4o",
+        suggested_model="gemini-3.1-pro-preview",
     ),
     AgentPresetSchema(
         id="preset-domain-expert",
@@ -83,7 +83,7 @@ _PRESETS: list[AgentPresetSchema] = [
             "constraints and established best practices."
         ),
         expertise="Domain-specific technical knowledge, applied research",
-        suggested_model="gpt-4o",
+        suggested_model="gpt-5.2",
     ),
 ]
 

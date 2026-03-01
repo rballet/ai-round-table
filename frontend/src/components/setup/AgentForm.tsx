@@ -20,6 +20,8 @@ const roleOptions: { value: AgentRole; label: string }[] = [
 const providerOptions = [
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'openai', label: 'OpenAI' },
+  { value: 'gemini', label: 'Google Gemini' },
+  { value: 'ollama', label: 'Ollama (local)' },
   { value: 'mock', label: 'Mock (no API key required)' },
 ];
 
@@ -29,7 +31,7 @@ const defaultDraft: AgentDraft = {
   persona_description: '',
   expertise: '',
   llm_provider: 'anthropic',
-  llm_model: 'claude-opus-4-5',
+  llm_model: 'claude-opus-4-6',
 };
 
 export function AgentForm({ initialValues, disabledRoles, onAdd, onCancel }: AgentFormProps) {
@@ -58,9 +60,16 @@ export function AgentForm({ initialValues, disabledRoles, onAdd, onCancel }: Age
       const next = { ...prev, [key]: value };
       // Auto-fill a sensible default model when switching providers
       if (key === 'llm_provider') {
-        if (value === 'mock') next.llm_model = 'mock';
-        else if (value === 'anthropic' && prev.llm_provider === 'mock') next.llm_model = 'claude-opus-4-5';
-        else if (value === 'openai' && prev.llm_provider === 'mock') next.llm_model = 'gpt-4o';
+        const defaults: Record<string, string> = {
+          anthropic: 'claude-opus-4-6',
+          openai: 'gpt-5.2',
+          gemini: 'gemini-3-flash-preview',
+          ollama: 'llama3.3',
+          mock: 'mock',
+        };
+        if (value === 'mock' || prev.llm_provider === 'mock') {
+          next.llm_model = defaults[value as string] ?? '';
+        }
       }
       return next;
     });
@@ -140,7 +149,7 @@ export function AgentForm({ initialValues, disabledRoles, onAdd, onCancel }: Age
             type="text"
             value={form.llm_model}
             onChange={(e) => set('llm_model', e.target.value)}
-            placeholder="e.g. claude-opus-4-5"
+            placeholder="e.g. claude-opus-4-6"
             className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white transition"
             aria-required="true"
             aria-describedby={errors.llm_model ? 'agent-model-error' : undefined}
