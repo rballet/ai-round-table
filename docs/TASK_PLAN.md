@@ -323,6 +323,9 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 - [ ] Test force-end before convergence
 - [ ] Verify cap termination produces a correctly labelled summary
 - [ ] Update frontend to listen to `CONVERGENCE_CHECK` WS event and update progress bar
+- [ ] Add a button to return to the session creation page from a specific session
+- [ ] Add an option to delete a given session
+- [ ] Fix priority queue implementation to correctly remove old requests
 
 ---
 

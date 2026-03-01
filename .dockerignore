@@ -1,0 +1,20 @@
+# Used when building frontend (context: .)
+.git
+.gitignore
+**/node_modules
+**/.next
+**/venv
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/*.db
+**/.env
+**/.env.*
+!**/.env.example
+backend
+.claude
+.agent
+.agents
+**/*.md
+!frontend/**/*.md

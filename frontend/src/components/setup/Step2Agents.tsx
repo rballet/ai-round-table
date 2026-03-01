@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useSessionStore, AgentDraft } from '@/store/sessionStore';
 import { AgentForm } from './AgentForm';
 import { PresetPanel } from './PresetPanel';
-import { AgentPreset } from 'shared/types/agent';
+import { AgentPreset, AgentRole } from 'shared/types/agent';
 
 interface Step2AgentsProps {
   onNext: () => void;
@@ -23,7 +23,9 @@ function validateLineup(agents: AgentDraft[]): string | null {
   const scribes = agents.filter((a) => a.role === 'scribe');
   const participants = agents.filter((a) => a.role === 'participant');
   if (moderators.length < 1) return 'You need at least 1 moderator agent.';
+  if (moderators.length > 1) return 'You can only have 1 moderator agent.';
   if (scribes.length < 1) return 'You need at least 1 scribe agent.';
+  if (scribes.length > 1) return 'You can only have 1 scribe agent.';
   if (participants.length < 2) return 'You need at least 2 participant agents.';
   return null;
 }
@@ -61,6 +63,12 @@ export function Step2Agents({ onNext, onBack }: Step2AgentsProps) {
     }
     onNext();
   };
+
+  const hasModerator = wizard.agents.some((a) => a.role === 'moderator');
+  const hasScribe = wizard.agents.some((a) => a.role === 'scribe');
+  const disabledRoles: AgentRole[] = [];
+  if (hasModerator) disabledRoles.push('moderator');
+  if (hasScribe) disabledRoles.push('scribe');
 
   return (
     <div className="space-y-6">
@@ -146,6 +154,7 @@ export function Step2Agents({ onNext, onBack }: Step2AgentsProps) {
                 <h3 className="text-sm font-semibold mb-4">New Agent</h3>
                 <AgentForm
                   initialValues={prefilledValues}
+                  disabledRoles={disabledRoles}
                   onAdd={handleAddAgent}
                   onCancel={() => { setShowForm(false); setPrefilledValues({}); }}
                 />

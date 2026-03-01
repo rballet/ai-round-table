@@ -195,11 +195,11 @@ async def test_orchestrator_pause_resume_end(db):
         llm_client=mock_llm
     )
     
-    orchestrator.pause()
+    await orchestrator.pause()
     assert not orchestrator._pause_event.is_set()
-    orchestrator.resume()
+    await orchestrator.resume()
     assert orchestrator._pause_event.is_set()
-    orchestrator.end()
+    await orchestrator.end()
     assert orchestrator._termination_flag == True
     assert orchestrator._termination_reason == "host"
 

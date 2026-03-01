@@ -217,6 +217,34 @@ test.describe('New session wizard – Step 2', () => {
     await expect(page.getByText('Temp Agent')).not.toBeVisible();
   });
 
+  test('disables the moderator role option after one moderator is added', async ({ page }) => {
+    await addAgent(page, 'First Moderator', 'moderator');
+
+    // Open the form again
+    await page.getByLabel('Add a new agent').click();
+    await expect(page.getByRole('heading', { name: 'New Agent' })).toBeVisible();
+
+    // Check that the moderator option is disabled
+    const select = page.getByLabel(/^Role/);
+    const modOption = select.locator('option[value="moderator"]');
+    await expect(modOption).toBeDisabled();
+    await expect(modOption).toContainText('(max 1)');
+  });
+
+  test('disables the scribe role option after one scribe is added', async ({ page }) => {
+    await addAgent(page, 'First Scribe', 'scribe');
+
+    // Open the form again
+    await page.getByLabel('Add a new agent').click();
+    await expect(page.getByRole('heading', { name: 'New Agent' })).toBeVisible();
+
+    // Check that the scribe option is disabled
+    const select = page.getByLabel(/^Role/);
+    const scribeOption = select.locator('option[value="scribe"]');
+    await expect(scribeOption).toBeDisabled();
+    await expect(scribeOption).toContainText('(max 1)');
+  });
+
   test('shows a validation error when advancing without meeting minimum role requirements', async ({
     page,
   }) => {

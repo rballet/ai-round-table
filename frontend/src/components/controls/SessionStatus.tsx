@@ -40,9 +40,8 @@ export function SessionStatus({
             {status}
           </span>
           <span
-            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-              convergenceStatus ? convergenceBadge[convergenceStatus] : 'bg-slate-100 text-slate-600'
-            }`}
+            className={`rounded-full px-2 py-0.5 text-xs font-medium ${convergenceStatus ? convergenceBadge[convergenceStatus] : 'bg-slate-100 text-slate-600'
+              }`}
           >
             {convergenceStatus ? `Convergence: ${convergenceStatus}` : 'Convergence: pending'}
           </span>
@@ -58,7 +57,12 @@ export function SessionStatus({
 
       <div className="h-2 overflow-hidden rounded-full bg-slate-200" aria-hidden>
         <div
-          className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-sky-500 transition-all duration-500"
+          className={`h-full rounded-full bg-gradient-to-r transition-all duration-500 ${convergenceStatus === 'converging'
+              ? 'from-emerald-500 to-emerald-400'
+              : convergenceStatus === 'capped'
+                ? 'from-slate-500 to-slate-400'
+                : 'from-cyan-500 to-sky-500'
+            }`}
           style={{ width: `${roundProgress}%` }}
         />
       </div>

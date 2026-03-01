@@ -185,3 +185,25 @@ async def save_summary(
     await db.commit()
     return summary
 
+
+async def delete_session(db: AsyncSession, session_id: str) -> bool:
+    from sqlalchemy import delete
+    
+    # Check if session exists first
+    session = await get_session(db, session_id)
+    if not session:
+        return False
+        
+    # Delete related objects first to ensure no orphaned records if cascades aren't fully configured
+    await db.execute(delete(Summary).where(Summary.session_id == session_id))
+    await db.execute(delete(QueueEntry).where(QueueEntry.session_id == session_id))
+    await db.execute(delete(Thought).where(Thought.session_id == session_id))
+    await db.execute(delete(Argument).where(Argument.session_id == session_id))
+    await db.execute(delete(Agent).where(Agent.session_id == session_id))
+    
+    # Finally delete the session itself
+    result = await db.execute(delete(Session).where(Session.id == session_id))
+    await db.commit()
+    
+    return result.rowcount > 0
+

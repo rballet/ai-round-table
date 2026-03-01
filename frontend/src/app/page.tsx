@@ -107,27 +107,57 @@ export default function SessionListPage() {
                     exit={{ opacity: 0, y: -8 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <Link
-                      href={`/sessions/${session.id}`}
-                      className="block p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
-                      aria-label={`Session: ${session.topic}, status: ${session.status}`}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-base truncate">{session.topic}</p>
-                          <div className="mt-1 flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
-                            <span>Created {formatDate(session.created_at)}</span>
-                            {session.agent_count !== undefined && (
-                              <span>{session.agent_count} agent{session.agent_count !== 1 ? 's' : ''}</span>
-                            )}
-                            {session.rounds_elapsed !== undefined && (
-                              <span>Round {session.rounds_elapsed} / {session.config.max_rounds}</span>
-                            )}
+                    <div className="relative group">
+                      <Link
+                        href={`/sessions/${session.id}`}
+                        className="block p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-900"
+                        aria-label={`Session: ${session.topic}, status: ${session.status}`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0 pr-8">
+                            <p className="font-semibold text-base truncate">{session.topic}</p>
+                            <div className="mt-1 flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+                              <span>Created {formatDate(session.created_at)}</span>
+                              {session.agent_count !== undefined && (
+                                <span>{session.agent_count} agent{session.agent_count !== 1 ? 's' : ''}</span>
+                              )}
+                              {session.rounds_elapsed !== undefined && (
+                                <span>Round {session.rounds_elapsed} / {session.config.max_rounds}</span>
+                              )}
+                            </div>
                           </div>
+                          <StatusBadge status={session.status} />
                         </div>
-                        <StatusBadge status={session.status} />
-                      </div>
-                    </Link>
+                      </Link>
+
+                      {/* Delete button (visible on hover) */}
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!confirm('Are you sure you want to delete this session?')) return;
+
+                          try {
+                            await api.deleteSession(session.id);
+                            // Refresh list
+                            const res = await api.getSessions();
+                            setSessions(res.sessions);
+                          } catch (err) {
+                            console.error('Failed to delete session:', err);
+                            alert('Failed to delete session');
+                          }
+                        }}
+                        className="absolute top-2 right-2 p-2 rounded-lg bg-red-100 hover:bg-red-200 text-red-600 opacity-0 group-hover:opacity-100 transition-opacity focus-visible:opacity-100 focus:outline-none focus-visible:outline-red-500"
+                        title="Delete session"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 6h18"></path>
+                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                        </svg>
+                      </button>
+                    </div>
                   </motion.li>
                 ))}
               </ul>

@@ -53,6 +53,18 @@ class QueueManager:
         priority_score: float,
         justification: str | None,
     ) -> QueueItem:
+        # Remove any existing active entry for the same agent to avoid duplicates
+        existing_entry_id = next(
+            (item.entry_id for _, _, item in self._active_items.values() if item.agent_id == agent_id),
+            None
+        )
+        if existing_entry_id:
+            self._active_items.pop(existing_entry_id, None)
+            async with self._session_factory() as db:
+                await queue_service.mark_queue_entry_processed(
+                    db, queue_entry_id=existing_entry_id
+                )
+
         async with self._session_factory() as db:
             persisted = await queue_service.create_queue_entry(
                 db,

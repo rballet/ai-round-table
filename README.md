@@ -14,3 +14,20 @@
 1. `npm install`
 2. Create `frontend/.env.local` from `frontend/.env.example`
 3. `cd frontend && npm run dev`
+
+## Docker (backend + frontend)
+
+Run both services with Docker Compose (useful for testing the full stack):
+
+```bash
+# Optional: set API keys for real LLM providers (backend)
+export OPENAI_API_KEY=your-key
+export ANTHROPIC_API_KEY=your-key
+
+docker compose up --build
+```
+
+- **Backend:** http://localhost:8000 (API + WebSocket)
+- **Frontend:** http://localhost:3000
+
+The frontend is built with `NEXT_PUBLIC_API_URL=http://localhost:8000` so the browser talks to the backend on the host. Backend SQLite data is stored in a Docker volume `backend_data`.

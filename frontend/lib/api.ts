@@ -45,6 +45,7 @@ export const api = {
     pauseSession: (id: string) => fetchApi<{ status: string }>(`/sessions/${id}/pause`, { method: 'POST' }),
     resumeSession: (id: string) => fetchApi<{ status: string }>(`/sessions/${id}/resume`, { method: 'POST' }),
     endSession: (id: string) => fetchApi<{ status: string }>(`/sessions/${id}/end`, { method: 'POST' }),
+    deleteSession: (id: string) => fetchApi<void>(`/sessions/${id}`, { method: 'DELETE' }),
     getSummary: (id: string) => fetchApi<SummaryResponse>(`/sessions/${id}/summary`),
     getPresets: () => fetchApi<PresetsResponse>('/agents/presets'),
     getSessions: () => fetchApi<SessionsListResponse>('/sessions'),

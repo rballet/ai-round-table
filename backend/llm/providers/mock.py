@@ -42,13 +42,21 @@ _DECIDE_TIERS = [
 
 
 def _is_decide_prompt(messages: list[Message]) -> bool:
-    """Return True if the message list is a decide prompt."""
+    """Return True if the message list is a decide prompt for a participant."""
     for msg in messages:
         content = msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", "")
-        if "Respond with ONLY a JSON object" in content or "request_token" in content:
+        if "request_token" in content:
             return True
     return False
 
+
+def _is_moderator_prompt(messages: list[Message]) -> bool:
+    """Return True if the message list is a moderator convergence prompt."""
+    for msg in messages:
+        content = msg.get("content", "") if isinstance(msg, dict) else getattr(msg, "content", "")
+        if "status\": \"converging\" | \"open\"" in content or "novel_claims_this_round" in content:
+            return True
+    return False
 
 def _agent_name_from_messages(messages: list[Message]) -> str:
     """Extract agent display name from the system message, or return empty string."""
@@ -94,6 +102,8 @@ class MockProvider(BaseLLMProvider):
 
         if _is_decide_prompt(messages):
             return self._decide_response(messages)
+        if _is_moderator_prompt(messages):
+            return self._moderator_response(messages)
         return self._text_response(messages)
 
     def _text_response(self, messages: list[Message]) -> str:
@@ -112,4 +122,13 @@ class MockProvider(BaseLLMProvider):
             "request_token": True,
             "novelty_tier": tier,
             "justification": justification,
+        })
+        
+    def _moderator_response(self, messages: list[Message]) -> str:
+        # Simulating open status, until end of test maybe? 
+        # Capped termination can happen, but let's just make it 'open' to avoid early termination, letting the Cap rule handle termination.
+        return json.dumps({
+            "status": "open",
+            "novel_claims_this_round": 1,
+            "justification": "Mock ongoing discussion"
         })

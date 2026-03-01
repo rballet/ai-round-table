@@ -306,6 +306,7 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
         case 'CONVERGENCE_CHECK':
           return {
             convergenceStatus: event.status,
+            currentRound: Math.max(state.currentRound, event.rounds_elapsed),
             session: state.session
               ? { ...state.session, rounds_elapsed: event.rounds_elapsed }
               : null,

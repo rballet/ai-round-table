@@ -6,6 +6,7 @@ import { AgentRole } from 'shared/types/agent';
 
 interface AgentFormProps {
   initialValues?: Partial<AgentDraft>;
+  disabledRoles?: AgentRole[];
   onAdd: (agent: AgentDraft) => void;
   onCancel: () => void;
 }
@@ -31,7 +32,7 @@ const defaultDraft: AgentDraft = {
   llm_model: 'claude-opus-4-5',
 };
 
-export function AgentForm({ initialValues, onAdd, onCancel }: AgentFormProps) {
+export function AgentForm({ initialValues, disabledRoles, onAdd, onCancel }: AgentFormProps) {
   const [form, setForm] = useState<AgentDraft>({
     ...defaultDraft,
     ...initialValues,
@@ -103,8 +104,8 @@ export function AgentForm({ initialValues, onAdd, onCancel }: AgentFormProps) {
             className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-white transition"
           >
             {roleOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
+              <option key={opt.value} value={opt.value} disabled={disabledRoles?.includes(opt.value)}>
+                {opt.label}{disabledRoles?.includes(opt.value) ? ' (max 1)' : ''}
               </option>
             ))}
           </select>

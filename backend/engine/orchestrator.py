@@ -36,15 +36,18 @@ class SessionOrchestrator:
         self._termination_flag = False
         self._termination_reason: str | None = None
 
-    def pause(self) -> None:
+    async def pause(self) -> None:
         self._pause_event.clear()
+        await self._emit_event("SESSION_PAUSED", {})
 
-    def resume(self) -> None:
+    async def resume(self) -> None:
         self._pause_event.set()
+        await self._emit_event("SESSION_RESUMED", {})
 
-    def end(self) -> None:
+    async def end(self) -> None:
         self._termination_flag = True
         self._termination_reason = "host"
+        self._pause_event.set()  # Wake loop if paused
 
     async def run(self, prompt: str) -> None:
         async with self._session_factory() as db:
@@ -129,12 +132,14 @@ class SessionOrchestrator:
 
         scribes = [a for a in agents if a.role == "scribe"]
         if scribes:
+            rounds_elapsed = moderator_state.total_turns_elapsed // max(1, len(participants))
             await self._phase_scribe(
                 topic=topic,
                 prompt=prompt,
                 supporting_context=supporting_context,
                 scribe=scribes[0],
                 termination_reason=self._termination_reason or "cap",
+                rounds_elapsed=rounds_elapsed,
             )
 
     async def _phase_think(
@@ -567,6 +572,7 @@ class SessionOrchestrator:
         supporting_context: str | None,
         scribe: AgentContext,
         termination_reason: str,
+        rounds_elapsed: int,
     ) -> None:
         async with self._session_factory() as db:
             runner = AgentRunner(
@@ -603,7 +609,11 @@ class SessionOrchestrator:
         await self._emit_event("SUMMARY_POSTED", payload)
         await self._emit_event(
             "SESSION_END",
-            {"termination_reason": termination_reason},
+            {
+                "reason": termination_reason,
+                "rounds_elapsed": rounds_elapsed,
+                "summary_id": summary.id,
+            },
         )
 
     @staticmethod

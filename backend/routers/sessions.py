@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import AsyncSessionLocal, get_db
@@ -176,7 +176,7 @@ async def pause_session(
     if orchestrator is None:
         raise HTTPException(status_code=404, detail="Session not running")
         
-    orchestrator.pause()
+    await orchestrator.pause()
     return {"session_id": session_id, "status": "paused"}
 
 
@@ -192,7 +192,7 @@ async def resume_session(
     if orchestrator is None:
         raise HTTPException(status_code=404, detail="Session not running")
         
-    orchestrator.resume()
+    await orchestrator.resume()
     return {"session_id": session_id, "status": "resumed"}
 
 
@@ -208,8 +208,27 @@ async def end_session(
     if orchestrator is None:
         raise HTTPException(status_code=404, detail="Session not running")
         
-    orchestrator.end()
+    await orchestrator.end()
     return {"session_id": session_id, "status": "ending"}
+
+
+@router.delete("/{session_id}")
+async def delete_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    request: Request = None,
+) -> Response:
+    # Check if session is running and force end it to clean up orchestrator state
+    if request and hasattr(request.app.state, "active_orchestrators"):
+        orchestrator = request.app.state.active_orchestrators.get(session_id)
+        if orchestrator:
+            await orchestrator.end()
+            request.app.state.active_orchestrators.pop(session_id, None)
+
+    success = await session_service.delete_session(db, session_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return Response(status_code=204)
 
 
 @router.get("/{session_id}/transcript", response_model=TranscriptResponseSchema)

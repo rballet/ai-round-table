@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { api } from '../../../../lib/api';
 import { RoundTable } from '@/components/table/RoundTable';
 import { QueuePanel } from '@/components/table/QueuePanel';
@@ -31,6 +32,7 @@ const selectSetSummary = (s: SessionStoreState) => s.setSummary;
 
 export default function LiveSessionPage() {
   const params = useParams<{ id: string | string[] }>();
+  const router = useRouter();
   const sessionId = useMemo(() => {
     const raw = params?.id;
     return Array.isArray(raw) ? raw[0] : raw ?? null;
@@ -118,6 +120,44 @@ export default function LiveSessionPage() {
     }
   }, [sessionId, startPrompt, session?.topic]);
 
+  const handlePauseSession = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      await api.pauseSession(sessionId);
+    } catch (err) {
+      console.error('Failed to pause session:', err);
+    }
+  }, [sessionId]);
+
+  const handleResumeSession = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      await api.resumeSession(sessionId);
+    } catch (err) {
+      console.error('Failed to resume session:', err);
+    }
+  }, [sessionId]);
+
+  const handleEndSession = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      await api.endSession(sessionId);
+    } catch (err) {
+      console.error('Failed to end session:', err);
+    }
+  }, [sessionId]);
+
+  const handleDeleteSession = useCallback(async () => {
+    if (!sessionId) return;
+    if (!confirm('Are you sure you want to delete this session? This action cannot be undone.')) return;
+    try {
+      await api.deleteSession(sessionId);
+      router.push('/');
+    } catch (err) {
+      console.error('Failed to delete session:', err);
+    }
+  }, [sessionId, router]);
+
   if (!sessionId) {
     return (
       <main className="min-h-screen bg-slate-50 px-6 py-10 text-slate-900">
@@ -166,10 +206,10 @@ export default function LiveSessionPage() {
             </span>
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-medium ${session?.status === 'running'
-                  ? 'bg-blue-100 text-blue-700'
-                  : session?.status === 'ended'
-                    ? 'bg-slate-100 text-slate-600'
-                    : 'bg-amber-50 text-amber-700'
+                ? 'bg-blue-100 text-blue-700'
+                : session?.status === 'ended'
+                  ? 'bg-slate-100 text-slate-600'
+                  : 'bg-amber-50 text-amber-700'
                 }`}
             >
               {session?.status}
@@ -183,6 +223,47 @@ export default function LiveSessionPage() {
                 View Summary
               </button>
             )}
+            {session?.status === 'running' && (
+              <button
+                type="button"
+                onClick={handlePauseSession}
+                className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-800 hover:bg-violet-200"
+              >
+                Pause
+              </button>
+            )}
+            {session?.status === 'paused' && (
+              <button
+                type="button"
+                onClick={handleResumeSession}
+                className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 hover:bg-emerald-200"
+              >
+                Resume
+              </button>
+            )}
+            {(session?.status === 'running' || session?.status === 'paused') && (
+              <button
+                type="button"
+                onClick={handleEndSession}
+                className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-800 hover:bg-rose-200"
+              >
+                Force End
+              </button>
+            )}
+            <div className="flex-1" /> {/* Spacer */}
+            <Link
+              href="/sessions/new"
+              className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-800 hover:bg-slate-200"
+            >
+              New Session
+            </Link>
+            <button
+              type="button"
+              onClick={handleDeleteSession}
+              className="rounded-full bg-rose-100 px-3 py-1 text-xs font-medium text-rose-800 hover:bg-rose-200"
+            >
+              Delete Session
+            </button>
           </div>
           {connectionError && <p className="text-xs text-rose-600">{connectionError}</p>}
         </header>
