@@ -395,7 +395,7 @@ A chronological feed displays each public Argument in a speech-bubble layout, at
 |---|---|
 | **Session template** | Optional. Load a saved template to pre-fill the agent lineup and session config. The topic is always left blank (question-specific). Every field remains editable after loading. |
 | **Topic / Question** | Required free text. The anchor for the entire session. |
-| **Supporting context** | Optional. The host may attach background notes or raw text (max 4 000 characters) to be shared with all agents as a knowledge base. Injected into every agent's Think prompt before the discussion begins. No new context can be added once the session starts. |
+| **Supporting context** | Optional. The host may attach background notes or raw text (max 10 000 characters) to be shared with all agents as a knowledge base. Injected into every agent's Think prompt before the discussion begins. No new context can be added once the session starts. |
 | **Agent lineup** | Add any number of agents. For each: display name, free-text persona description, free-text area of expertise, LLM provider, and LLM model. Presets are browsable by category and any configured agent can be saved as a custom preset for reuse. |
 | **Max rounds** | Hard turn cap expressed as total rounds, where one round = one speaking turn per participating agent (default: 3 rounds). |
 | **Convergence majority** | % of agents that must align on the dominant position to trigger organic convergence (default: 60%). |
@@ -409,7 +409,7 @@ A chronological feed displays each public Argument in a speech-bubble layout, at
 
 ```
 Session
-  id, topic, supporting_context (text, max 4 000 chars),
+  id, topic, supporting_context (text, max 10 000 chars),
   status, config (JSON), created_at, ended_at, termination_reason
 
 Agent

@@ -40,9 +40,12 @@ class GeminiProvider(BaseLLMProvider):
             self._client = None
             return
 
-        self._client = genai.Client(
-            api_key=api_key or settings.GOOGLE_API_KEY
-        )
+        resolved_api_key = api_key or settings.GOOGLE_API_KEY
+        if not resolved_api_key:
+            self._client = None
+            return
+
+        self._client = genai.Client(api_key=resolved_api_key)
 
     async def complete(
         self,

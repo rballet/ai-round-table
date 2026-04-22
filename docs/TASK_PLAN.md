@@ -390,7 +390,7 @@ Define all TypeScript types in `shared/types/`. These are the contract — both 
 - [x] Preview how context will appear in Think prompt (collapsible details)
 
 **Backend:**
-- [x] Validate context length (max ~4000 chars in v1) — 422 on exceed
+- [x] Validate context length (max ~10000 chars in v1) — 422 on exceed
 - [x] Context stored on `Session.supporting_context`
 - [x] Injected into Think prompt builder for all agents
 

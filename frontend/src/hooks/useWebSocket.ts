@@ -43,7 +43,9 @@ export function useWebSocket(sessionId: string | null) {
     }
 
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const wsUrl = `${toWebSocketBaseUrl(apiBaseUrl)}/sessions/${sessionId}/stream`;
+    const wsBaseUrl =
+      process.env.NEXT_PUBLIC_WS_URL || toWebSocketBaseUrl(apiBaseUrl);
+    const wsUrl = `${wsBaseUrl}/sessions/${sessionId}/stream`;
     const ws = new WebSocket(wsUrl);
     let heartbeat: NodeJS.Timeout | null = null;
 

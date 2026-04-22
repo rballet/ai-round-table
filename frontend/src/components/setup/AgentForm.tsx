@@ -23,12 +23,14 @@ type ModelOption = { value: string; label: string };
 
 const providerModels: Record<string, ModelOption[]> = {
   anthropic: [
-    { value: 'claude-opus-4-6',   label: 'claude-opus-4-6 — Most capable' },
+    { value: 'claude-opus-4-7', label: 'claude-opus-4-7 — Latest flagship model' },
+    { value: 'claude-opus-4-6',   label: 'claude-opus-4-6 — Previous flagship' },
     { value: 'claude-sonnet-4-6', label: 'claude-sonnet-4-6 — Balanced' },
     { value: 'claude-haiku-4-5',  label: 'claude-haiku-4-5 — Fastest' },
   ],
   openai: [
-    { value: 'gpt-5.2',    label: 'gpt-5.2 — Most capable' },
+    { value: 'gpt-5.4',    label: 'gpt-5.4 — Latest flagship model' },
+    { value: 'gpt-5.2',    label: 'gpt-5.2 — Previous frontier model' },
     { value: 'gpt-5-mini', label: 'gpt-5-mini — Efficient' },
     { value: 'o3',         label: 'o3 — Reasoning' },
     { value: 'o4-mini',    label: 'o4-mini — Fast reasoning' },

@@ -363,18 +363,18 @@ async def test_session_argue_error_does_not_crash_loop(db: AsyncSession):
 
 
 # ---------------------------------------------------------------------------
-# Test 4: supporting_context validation (max 4000 chars)
+# Test 4: supporting_context validation (max 10000 chars)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_supporting_context_validation_max_4000_chars(db: AsyncSession):
-    """session_service must not raise for 4000-char context; the HTTP layer enforces the cap.
+async def test_supporting_context_validation_max_10000_chars(db: AsyncSession):
+    """session_service must not raise for 10000-char context; the HTTP layer enforces the cap.
 
     The 422 validation is done in the router (not the service), so we test that the
-    service itself accepts a 4000-char value without error, and separately confirm that
+    service itself accepts a 10000-char value without error, and separately confirm that
     a context within limit is stored correctly.
     """
-    long_context = "x" * 4000
+    long_context = "x" * 10000
     request = CreateSessionRequestSchema(
         topic="Boundary test",
         supporting_context=long_context,

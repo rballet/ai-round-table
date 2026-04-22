@@ -339,9 +339,9 @@ export const handlers = [
   http.post('/sessions', async ({ request }) => {
     const body = await request.json() as Record<string, unknown>;
     const supporting_context = (body.supporting_context as string | undefined) ?? '';
-    if (supporting_context.length > 4000) {
+    if (supporting_context.length > 10000) {
       return HttpResponse.json(
-        { detail: 'supporting_context exceeds maximum length of 4000 characters.' },
+        { detail: 'supporting_context exceeds maximum length of 10000 characters.' },
         { status: 422 }
       );
     }

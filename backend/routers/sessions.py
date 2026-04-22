@@ -26,6 +26,7 @@ from schemas.session import SessionSchema, SessionTemplateSchema
 from services import error_service, session_service, template_service
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+MAX_SUPPORTING_CONTEXT_CHARS = 10000
 
 
 def _serialize_session(session) -> SessionSchema:
@@ -64,10 +65,16 @@ async def create_session(
     request: CreateSessionRequestSchema,
     db: AsyncSession = Depends(get_db),
 ) -> SessionResponseSchema:
-    if request.supporting_context and len(request.supporting_context) > 4000:
+    if (
+        request.supporting_context
+        and len(request.supporting_context) > MAX_SUPPORTING_CONTEXT_CHARS
+    ):
         raise HTTPException(
             status_code=422,
-            detail="supporting_context exceeds the maximum length of 4000 characters.",
+            detail=(
+                "supporting_context exceeds the maximum length of "
+                f"{MAX_SUPPORTING_CONTEXT_CHARS} characters."
+            ),
         )
     session = await session_service.create_session(db, request)
     base = _serialize_session(session)
@@ -440,4 +447,3 @@ async def get_errors(
         )
 
     return ErrorsResponseSchema(session_id=session_id, errors=errors_out)
-

@@ -321,7 +321,7 @@ Create a new session with full configuration.
 ```json
 {
   "topic": "Should we use microservices or a monolith for our new platform?",
-  "supporting_context": "Our team has 4 engineers. Current stack is a Django monolith serving 50k MAU.",  // max 4000 chars
+  "supporting_context": "Our team has 4 engineers. Current stack is a Django monolith serving 50k MAU.",  // max 10000 chars
   "config": {
     "max_rounds": 3,
     "convergence_majority": 0.6,
@@ -338,7 +338,7 @@ Create a new session with full configuration.
       "persona_description": "You are a pragmatic backend engineer who has migrated two systems from monolith to microservices. You are sceptical of hype and demand evidence.",
       "expertise": "Distributed systems, backend architecture, team scaling",
       "llm_provider": "anthropic",
-      "llm_model": "claude-opus-4-5",
+      "llm_model": "claude-opus-4-7",
       "llm_config": { "temperature": 0.7, "max_tokens": 1000 },
       "role": "participant"
     },
@@ -347,7 +347,7 @@ Create a new session with full configuration.
       "persona_description": "You are a neutral discussion facilitator. You do not have opinions.",
       "expertise": "Facilitation",
       "llm_provider": "anthropic",
-      "llm_model": "claude-sonnet-4-5",
+      "llm_model": "claude-sonnet-4-6",
       "llm_config": { "temperature": 0.2, "max_tokens": 500 },
       "role": "moderator"
     },
@@ -356,7 +356,7 @@ Create a new session with full configuration.
       "persona_description": "You are a precise technical writer. You summarise discussions without opinion.",
       "expertise": "Technical writing",
       "llm_provider": "openai",
-      "llm_model": "gpt-4o",
+      "llm_model": "gpt-5.4",
       "llm_config": { "temperature": 0.3, "max_tokens": 2000 },
       "role": "scribe"
     }
@@ -378,7 +378,7 @@ Create a new session with full configuration.
       "display_name": "Alex",
       "role": "participant",
       "llm_provider": "anthropic",
-      "llm_model": "claude-opus-4-5"
+      "llm_model": "claude-opus-4-7"
     }
   ],
   "created_at": "2026-02-15T10:00:00Z"
@@ -593,7 +593,7 @@ Save a user-created persona preset.
   "display_name": "My Custom Expert",
   "persona_description": "...",
   "expertise": "...",
-  "suggested_model": "gpt-4o",
+  "suggested_model": "gpt-5.4",
   "llm_provider": "openai",
   "category": "engineering"
 }
@@ -1099,7 +1099,7 @@ OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
 GOOGLE_API_KEY=...            # Required for Gemini provider
 OLLAMA_BASE_URL=http://localhost:11434  # Required for Ollama provider
-LLM_TIMEOUT_SECONDS=120       # Per-call LLM timeout (default: 120)
+LLM_TIMEOUT_SECONDS=180       # Per-call LLM timeout (default: 180)
 LOG_DIR=                      # Optional: directory for per-session prompt logs
 
 # .env.local (frontend)

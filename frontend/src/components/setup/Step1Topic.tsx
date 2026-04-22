@@ -6,7 +6,7 @@ interface Step1TopicProps {
   onNext: () => void;
 }
 
-const MAX_CONTEXT_CHARS = 4000;
+const MAX_CONTEXT_CHARS = 10000;
 
 export function Step1Topic({ onNext }: Step1TopicProps) {
   const { wizard, setWizardTopic, setWizardContext } = useSessionStore();
